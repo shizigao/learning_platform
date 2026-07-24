@@ -1,0 +1,275 @@
+package com.learningplatform.content.mapper;
+
+import com.learningplatform.content.domain.ContentStatus;
+import com.learningplatform.content.domain.ContentType;
+import com.learningplatform.content.domain.LearningContent;
+import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+@Mapper
+public interface LearningContentMapper {
+    String COLUMNS = """
+            lc.id, lc.publisher_id, publisher.nickname AS publisher_name,
+            lc.category_id, lc.title, lc.summary, lc.content_type, lc.article_body,
+            lc.cover_file_id, lc.is_free AS free, lc.price, lc.status, lc.rejection_reason,
+            lc.view_count, lc.like_count, lc.favorite_count, lc.comment_count,
+            lc.submitted_at, lc.published_at, lc.created_at, lc.updated_at, lc.deleted
+            """;
+
+    @Select("""
+            SELECT
+            """ + COLUMNS + """
+            FROM learning_content lc
+            JOIN `user` publisher ON publisher.id = lc.publisher_id AND publisher.deleted = 0
+            WHERE lc.id = #{id} AND lc.deleted = 0
+            """)
+    Optional<LearningContent> findById(Long id);
+
+    @Insert("""
+            INSERT INTO learning_content (
+                publisher_id, category_id, title, summary, content_type, article_body,
+                is_free, price, status
+            ) VALUES (
+                #{publisherId}, #{categoryId}, #{title}, #{summary}, #{contentType}, #{articleBody},
+                #{free}, #{price}, #{status}
+            )
+            """)
+    @Options(useGeneratedKeys = true, keyProperty = "id")
+    int insert(LearningContent content);
+
+    @Update("""
+            UPDATE learning_content
+            SET category_id = #{categoryId},
+                title = #{title},
+                summary = #{summary},
+                content_type = #{contentType},
+                article_body = #{articleBody},
+                is_free = #{free},
+                price = #{price},
+                status = #{status},
+                rejection_reason = NULL
+            WHERE id = #{id} AND publisher_id = #{publisherId} AND deleted = 0
+              AND status IN ('DRAFT', 'REJECTED')
+            """)
+    int updateEditable(LearningContent content);
+
+    @Update("""
+            UPDATE learning_content
+            SET cover_file_id = #{fileId}
+            WHERE id = #{contentId} AND deleted = 0
+            """)
+    int updateCoverFileId(@Param("contentId") Long contentId, @Param("fileId") Long fileId);
+
+    @Update("""
+            UPDATE learning_content
+            SET status = 'PENDING_REVIEW', rejection_reason = NULL, submitted_at = #{submittedAt}
+            WHERE id = #{id} AND publisher_id = #{publisherId} AND deleted = 0
+              AND status IN ('DRAFT', 'REJECTED')
+            """)
+    int submit(
+            @Param("id") Long id,
+            @Param("publisherId") Long publisherId,
+            @Param("submittedAt") LocalDateTime submittedAt
+    );
+
+    @Update("""
+            UPDATE learning_content
+            SET status = 'PUBLISHED', rejection_reason = NULL, published_at = #{publishedAt}
+            WHERE id = #{id} AND deleted = 0 AND status = 'PENDING_REVIEW'
+            """)
+    int approve(@Param("id") Long id, @Param("publishedAt") LocalDateTime publishedAt);
+
+    @Update("""
+            UPDATE learning_content
+            SET status = 'REJECTED', rejection_reason = #{reason}
+            WHERE id = #{id} AND deleted = 0 AND status = 'PENDING_REVIEW'
+            """)
+    int reject(@Param("id") Long id, @Param("reason") String reason);
+
+    @Update("""
+            UPDATE learning_content
+            SET status = 'OFFLINE'
+            WHERE id = #{id} AND deleted = 0 AND status = 'PUBLISHED'
+            """)
+    int takeOffline(Long id);
+
+    @Update("""
+            UPDATE learning_content
+            SET status = 'PUBLISHED', published_at = #{publishedAt}
+            WHERE id = #{id} AND deleted = 0 AND status = 'OFFLINE'
+            """)
+    int republish(@Param("id") Long id, @Param("publishedAt") LocalDateTime publishedAt);
+
+    @Update("""
+            UPDATE learning_content
+            SET deleted = 1
+            WHERE id = #{id} AND publisher_id = #{publisherId} AND deleted = 0
+              AND status IN ('DRAFT', 'REJECTED')
+            """)
+    int softDelete(@Param("id") Long id, @Param("publisherId") Long publisherId);
+
+    @Update("""
+            UPDATE learning_content
+            SET view_count = view_count + 1
+            WHERE id = #{id} AND deleted = 0 AND status = 'PUBLISHED'
+            """)
+    int incrementViewCount(Long id);
+
+    @Update("""
+            UPDATE learning_content
+            SET like_count = like_count + 1
+            WHERE id = #{id} AND deleted = 0 AND status = 'PUBLISHED'
+            """)
+    int incrementLikeCount(Long id);
+
+    @Update("""
+            UPDATE learning_content
+            SET like_count = GREATEST(like_count - 1, 0)
+            WHERE id = #{id} AND deleted = 0
+            """)
+    int decrementLikeCount(Long id);
+
+    @Update("""
+            UPDATE learning_content
+            SET favorite_count = favorite_count + 1
+            WHERE id = #{id} AND deleted = 0 AND status = 'PUBLISHED'
+            """)
+    int incrementFavoriteCount(Long id);
+
+    @Update("""
+            UPDATE learning_content
+            SET favorite_count = GREATEST(favorite_count - 1, 0)
+            WHERE id = #{id} AND deleted = 0
+            """)
+    int decrementFavoriteCount(Long id);
+
+    @Update("""
+            UPDATE learning_content
+            SET comment_count = comment_count + 1
+            WHERE id = #{id} AND deleted = 0 AND status = 'PUBLISHED'
+            """)
+    int incrementCommentCount(Long id);
+
+    @Select("""
+            <script>
+            SELECT COUNT(*)
+            FROM learning_content
+            WHERE deleted = 0 AND status = 'PUBLISHED'
+            <if test='keyword != null'>AND (title LIKE CONCAT('%', #{keyword}, '%') OR summary LIKE CONCAT('%', #{keyword}, '%'))</if>
+            <if test='categoryId != null'>AND category_id = #{categoryId}</if>
+            <if test='contentType != null'>AND content_type = #{contentType}</if>
+            <if test='free != null'>AND is_free = #{free}</if>
+            </script>
+            """)
+    long countPublished(
+            @Param("keyword") String keyword,
+            @Param("categoryId") Long categoryId,
+            @Param("contentType") ContentType contentType,
+            @Param("free") Boolean free
+    );
+
+    @Select("""
+            <script>
+            SELECT
+            """ + COLUMNS + """
+            FROM learning_content lc
+            JOIN `user` publisher ON publisher.id = lc.publisher_id AND publisher.deleted = 0
+            WHERE lc.deleted = 0 AND lc.status = 'PUBLISHED'
+            <if test='keyword != null'>AND (lc.title LIKE CONCAT('%', #{keyword}, '%') OR lc.summary LIKE CONCAT('%', #{keyword}, '%'))</if>
+            <if test='categoryId != null'>AND lc.category_id = #{categoryId}</if>
+            <if test='contentType != null'>AND lc.content_type = #{contentType}</if>
+            <if test='free != null'>AND lc.is_free = #{free}</if>
+            ORDER BY lc.published_at DESC, lc.id DESC
+            LIMIT #{limit} OFFSET #{offset}
+            </script>
+            """)
+    List<LearningContent> findPublished(
+            @Param("keyword") String keyword,
+            @Param("categoryId") Long categoryId,
+            @Param("contentType") ContentType contentType,
+            @Param("free") Boolean free,
+            @Param("offset") long offset,
+            @Param("limit") int limit
+    );
+
+    @Select("""
+            <script>
+            SELECT COUNT(*)
+            FROM learning_content
+            WHERE deleted = 0 AND publisher_id = #{publisherId}
+            <if test='status != null'>AND status = #{status}</if>
+            <if test='keyword != null'>AND title LIKE CONCAT('%', #{keyword}, '%')</if>
+            </script>
+            """)
+    long countByPublisher(
+            @Param("publisherId") Long publisherId,
+            @Param("status") ContentStatus status,
+            @Param("keyword") String keyword
+    );
+
+    @Select("""
+            <script>
+            SELECT
+            """ + COLUMNS + """
+            FROM learning_content lc
+            JOIN `user` publisher ON publisher.id = lc.publisher_id AND publisher.deleted = 0
+            WHERE lc.deleted = 0 AND lc.publisher_id = #{publisherId}
+            <if test='status != null'>AND lc.status = #{status}</if>
+            <if test='keyword != null'>AND lc.title LIKE CONCAT('%', #{keyword}, '%')</if>
+            ORDER BY lc.updated_at DESC, lc.id DESC
+            LIMIT #{limit} OFFSET #{offset}
+            </script>
+            """)
+    List<LearningContent> findByPublisher(
+            @Param("publisherId") Long publisherId,
+            @Param("status") ContentStatus status,
+            @Param("keyword") String keyword,
+            @Param("offset") long offset,
+            @Param("limit") int limit
+    );
+
+    @Select("""
+            <script>
+            SELECT COUNT(*)
+            FROM learning_content
+            WHERE deleted = 0
+            <if test='status != null'>AND status = #{status}</if>
+            <if test='keyword != null'>AND title LIKE CONCAT('%', #{keyword}, '%')</if>
+            </script>
+            """)
+    long countForAdmin(
+            @Param("status") ContentStatus status,
+            @Param("keyword") String keyword
+    );
+
+    @Select("""
+            <script>
+            SELECT
+            """ + COLUMNS + """
+            FROM learning_content lc
+            JOIN `user` publisher ON publisher.id = lc.publisher_id AND publisher.deleted = 0
+            WHERE lc.deleted = 0
+            <if test='status != null'>AND lc.status = #{status}</if>
+            <if test='keyword != null'>AND lc.title LIKE CONCAT('%', #{keyword}, '%')</if>
+            ORDER BY
+              CASE WHEN lc.status = 'PENDING_REVIEW' THEN 0 ELSE 1 END,
+              lc.updated_at DESC,
+              lc.id DESC
+            LIMIT #{limit} OFFSET #{offset}
+            </script>
+            """)
+    List<LearningContent> findForAdmin(
+            @Param("status") ContentStatus status,
+            @Param("keyword") String keyword,
+            @Param("offset") long offset,
+            @Param("limit") int limit
+    );
+}

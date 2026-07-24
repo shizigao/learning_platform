@@ -1,0 +1,79 @@
+:root {
+  --lp-primary: #2563eb;
+  --lp-primary-dark: #1d4ed8;
+  --lp-text: #172033;
+  --lp-text-secondary: #667085;
+  --lp-border: #e4e7ec;
+  --lp-surface: #ffffff;
+  --lp-background: #f6f8fc;
+  --lp-success: #12b76a;
+  --lp-shadow: 0 12px 36px rgb(16 24 40 / 8%);
+  font-family:
+    Inter, "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  color: var(--lp-text);
+  background: var(--lp-background);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: var(--lp-background);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.page-container {
+  width: min(1180px, calc(100% - 40px));
+  margin: 0 auto;
+}
+
+.page-title {
+  margin: 0;
+  color: var(--lp-text);
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+}
+
+.page-description {
+  margin: 14px 0 0;
+  color: var(--lp-text-secondary);
+  font-size: 17px;
+  line-height: 1.75;
+}
+
+@media (max-width: 640px) {
+  .page-container {
+    width: min(100% - 24px, 1180px);
+  }
+}
+

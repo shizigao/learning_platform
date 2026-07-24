@@ -1,0 +1,245 @@
+import { createRouter, createWebHistory } from 'vue-router'
+
+import DefaultLayout from '@/layouts/DefaultLayout.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const router = createRouter({
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes: [
+    {
+      path: '/',
+      component: DefaultLayout,
+      children: [
+        {
+          path: '',
+          name: 'home',
+          component: () => import('@/views/HomeView.vue'),
+          meta: { title: '首页' },
+        },
+        {
+          path: 'contents',
+          name: 'contents',
+          component: () => import('@/views/ContentsView.vue'),
+          meta: {
+            title: '学习资料',
+            requiresAuth: true,
+            roles: ['USER', 'PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
+          path: 'contents/:id',
+          name: 'content-detail',
+          component: () => import('@/views/ContentDetailView.vue'),
+          meta: {
+            title: '资料详情',
+            requiresAuth: true,
+            roles: ['USER', 'PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
+          path: 'contents/:id/learn',
+          name: 'content-learning',
+          component: () => import('@/views/LearningView.vue'),
+          meta: {
+            title: '在线学习',
+            requiresAuth: true,
+            roles: ['USER', 'PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
+          path: 'exams',
+          name: 'exams',
+          component: () => import('@/views/ExamsView.vue'),
+          meta: {
+            title: '考试中心',
+            requiresAuth: true,
+            roles: ['USER', 'PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
+          path: 'exams/:id',
+          name: 'exam-entry',
+          component: () => import('@/views/ExamEntryView.vue'),
+          meta: {
+            title: '考试说明',
+            requiresAuth: true,
+            roles: ['USER', 'PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
+          path: 'exams/:id/result',
+          name: 'exam-result',
+          component: () => import('@/views/ExamResultView.vue'),
+          meta: {
+            title: '考试成绩',
+            requiresAuth: true,
+            roles: ['USER', 'PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
+          path: 'ai-assistant',
+          name: 'ai-assistant',
+          component: () => import('@/views/PortalPlaceholderView.vue'),
+          meta: { title: 'AI 学习助手', description: 'AI 总结与知识讲解将在后续阶段开放。' },
+        },
+        {
+          path: 'my-learning',
+          name: 'my-learning',
+          component: () => import('@/views/MyLearningView.vue'),
+          meta: { title: '我的学习', requiresAuth: true, roles: ['USER', 'PUBLISHER', 'ADMIN'] },
+        },
+        {
+          path: 'favorites',
+          name: 'favorites',
+          component: () => import('@/views/FavoritesView.vue'),
+          meta: { title: '我的收藏', requiresAuth: true, roles: ['USER', 'PUBLISHER', 'ADMIN'] },
+        },
+        {
+          path: 'profile',
+          name: 'profile',
+          component: () => import('@/views/ProfileView.vue'),
+          meta: { title: '个人中心', requiresAuth: true, roles: ['USER', 'PUBLISHER', 'ADMIN'] },
+        },
+        {
+          path: 'commerce',
+          name: 'commerce',
+          component: () => import('@/views/CommerceView.vue'),
+          meta: {
+            title: '商品、订单与权益',
+            requiresAuth: true,
+            roles: ['USER', 'PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
+          path: 'publisher',
+          name: 'publisher',
+          component: () => import('@/views/PublisherContentsView.vue'),
+          meta: {
+            title: '发布者工作台',
+            requiresAuth: true,
+            roles: ['PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
+          path: 'publisher/contents/new',
+          name: 'publisher-content-new',
+          component: () => import('@/views/PublisherContentEditorView.vue'),
+          meta: {
+            title: '新建学习资料',
+            requiresAuth: true,
+            roles: ['PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
+          path: 'publisher/contents/:id/edit',
+          name: 'publisher-content-edit',
+          component: () => import('@/views/PublisherContentEditorView.vue'),
+          meta: {
+            title: '编辑学习资料',
+            requiresAuth: true,
+            roles: ['PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
+          path: 'publisher/questions',
+          name: 'publisher-questions',
+          component: () => import('@/views/PublisherQuestionsView.vue'),
+          meta: {
+            title: '题库管理',
+            requiresAuth: true,
+            roles: ['PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
+          path: 'publisher/papers',
+          name: 'publisher-papers',
+          component: () => import('@/views/PublisherPapersView.vue'),
+          meta: {
+            title: '固定试卷',
+            requiresAuth: true,
+            roles: ['PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
+          path: 'publisher/exams',
+          name: 'publisher-exams',
+          component: () => import('@/views/PublisherExamsView.vue'),
+          meta: {
+            title: '考试管理',
+            requiresAuth: true,
+            roles: ['PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
+          path: 'publisher/exams/:id/grading',
+          name: 'publisher-exam-grading',
+          component: () => import('@/views/PublisherExamGradingView.vue'),
+          meta: {
+            title: '阅卷与统计',
+            requiresAuth: true,
+            roles: ['PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
+          path: 'admin',
+          name: 'admin',
+          component: () => import('@/views/AdminWorkspaceView.vue'),
+          meta: {
+            title: '管理后台',
+            requiresAuth: true,
+            roles: ['ADMIN'],
+          },
+        },
+      ],
+    },
+    {
+      path: '/auth',
+      component: () => import('@/layouts/AuthLayout.vue'),
+      children: [
+        {
+          path: '/login',
+          name: 'login',
+          component: () => import('@/views/LoginView.vue'),
+          meta: { title: '登录', guestOnly: true },
+        },
+        {
+          path: '/register',
+          name: 'register',
+          component: () => import('@/views/RegisterView.vue'),
+          meta: { title: '注册', guestOnly: true },
+        },
+      ],
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('@/views/NotFoundView.vue'),
+      meta: { title: '页面不存在' },
+    },
+  ],
+  scrollBehavior: () => ({ top: 0 }),
+})
+
+router.beforeEach(async (to) => {
+  const authStore = useAuthStore()
+  await authStore.initialize()
+
+  if (to.meta.guestOnly && authStore.isAuthenticated) {
+    return { name: 'home' }
+  }
+  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
+  if (to.meta.roles?.length && !authStore.hasRole(...to.meta.roles)) {
+    return { name: 'home', query: { forbidden: '1' } }
+  }
+  return true
+})
+
+router.afterEach((to) => {
+  const pageTitle = typeof to.meta.title === 'string' ? to.meta.title : ''
+  const appTitle = import.meta.env.VITE_APP_TITLE || '智能在线学习考试平台'
+  document.title = pageTitle ? `${pageTitle} - ${appTitle}` : appTitle
+})
+
+export default router

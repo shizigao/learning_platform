@@ -1,0 +1,428 @@
+package com.learningplatform.question.service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.learningplatform.common.api.ErrorCode;
+import com.learningplatform.common.exception.BusinessException;
+import com.learningplatform.common.page.PageResult;
+import com.learningplatform.question.domain.Question;
+import com.learningplatform.question.domain.QuestionBank;
+import com.learningplatform.question.domain.QuestionOption;
+import com.learningplatform.question.domain.QuestionStatus;
+import com.learningplatform.question.domain.QuestionType;
+import com.learningplatform.question.dto.CandidateQuestionResponse;
+import com.learningplatform.question.dto.QuestionAnswer;
+import com.learningplatform.question.dto.QuestionListQuery;
+import com.learningplatform.question.dto.QuestionManagementResponse;
+import com.learningplatform.question.dto.QuestionOptionResponse;
+import com.learningplatform.question.dto.QuestionOptionWriteRequest;
+import com.learningplatform.question.dto.QuestionWriteRequest;
+import com.learningplatform.question.mapper.QuestionMapper;
+import com.learningplatform.question.mapper.QuestionOptionMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+
+@Service
+public class QuestionService {
+    private static final int MIN_CHOICE_OPTIONS = 2;
+
+    private final QuestionMapper questionMapper;
+    private final QuestionOptionMapper optionMapper;
+    private final QuestionBankService bankService;
+    private final ObjectMapper objectMapper;
+
+    public QuestionService(
+            QuestionMapper questionMapper,
+            QuestionOptionMapper optionMapper,
+            QuestionBankService bankService,
+            ObjectMapper objectMapper
+    ) {
+        this.questionMapper = questionMapper;
+        this.optionMapper = optionMapper;
+        this.bankService = bankService;
+        this.objectMapper = objectMapper;
+    }
+
+    public PageResult<QuestionManagementResponse> list(
+            Long ownerId,
+            QuestionListQuery query
+    ) {
+        if (query.getBankId() != null) {
+            QuestionBank bank = bankService.getRequired(query.getBankId());
+            bankService.assertOwnerOrAdmin(bank, ownerId, false);
+        }
+        String keyword = normalize(query.getKeyword());
+        long total = questionMapper.countByOwner(
+                ownerId,
+                query.getBankId(),
+                query.getQuestionType(),
+                keyword
+        );
+        List<QuestionManagementResponse> items = questionMapper.findByOwner(
+                        ownerId,
+                        query.getBankId(),
+                        query.getQuestionType(),
+                        keyword,
+                        query.offset(),
+                        query.getPageSize()
+                ).stream()
+                .map(this::managementResponse)
+                .toList();
+        return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
+    }
+
+    @Transactional
+    public QuestionManagementResponse create(
+            Long creatorId,
+            boolean creatorAdmin,
+            QuestionWriteRequest request
+    ) {
+        QuestionBank bank = bankService.getRequired(request.bankId());
+        bankService.assertOwnerOrAdmin(bank, creatorId, creatorAdmin);
+        NormalizedQuestion normalized = validateAndNormalize(request);
+
+        Question question = new Question();
+        question.setCreatorId(creatorId);
+        question.setStatus(QuestionStatus.ACTIVE);
+        apply(question, request, normalized.answer());
+        if (questionMapper.insert(question) != 1) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "创建题目失败");
+        }
+        replaceOptions(question.getId(), normalized.options(), normalized.correctOptionKeys());
+        return managementResponse(getRequired(question.getId()));
+    }
+
+    public QuestionManagementResponse detail(
+            Long questionId,
+            Long requesterId,
+            boolean requesterAdmin
+    ) {
+        Question question = getRequired(questionId);
+        assertOwnerOrAdmin(question, requesterId, requesterAdmin);
+        return managementResponse(question);
+    }
+
+    @Transactional
+    public QuestionManagementResponse update(
+            Long questionId,
+            Long requesterId,
+            boolean requesterAdmin,
+            QuestionWriteRequest request
+    ) {
+        Question question = getRequired(questionId);
+        assertOwnerOrAdmin(question, requesterId, requesterAdmin);
+        QuestionBank targetBank = bankService.getRequired(request.bankId());
+        bankService.assertOwnerOrAdmin(targetBank, requesterId, requesterAdmin);
+        NormalizedQuestion normalized = validateAndNormalize(request);
+
+        apply(question, request, normalized.answer());
+        if (questionMapper.update(question) != 1) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "题目不存在");
+        }
+        replaceOptions(questionId, normalized.options(), normalized.correctOptionKeys());
+        return managementResponse(getRequired(questionId));
+    }
+
+    @Transactional
+    public void delete(Long questionId, Long requesterId, boolean requesterAdmin) {
+        Question question = getRequired(questionId);
+        assertOwnerOrAdmin(question, requesterId, requesterAdmin);
+        if (questionMapper.softDelete(questionId) != 1) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "题目不存在");
+        }
+    }
+
+    /**
+     * 供后续组卷和考试作答接口复用的安全投影。
+     */
+    public CandidateQuestionResponse candidateProjection(Long questionId) {
+        Question question = getRequired(questionId);
+        return new CandidateQuestionResponse(
+                question.getId(),
+                question.getQuestionType(),
+                question.getStem(),
+                safeOptions(questionId),
+                question.getDefaultScore()
+        );
+    }
+
+    public Question getRequired(Long questionId) {
+        return questionMapper.findById(questionId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "题目不存在"));
+    }
+
+    private void assertOwnerOrAdmin(Question question, Long requesterId, boolean requesterAdmin) {
+        QuestionBank bank = bankService.getRequired(question.getBankId());
+        bankService.assertOwnerOrAdmin(bank, requesterId, requesterAdmin);
+    }
+
+    private void apply(Question question, QuestionWriteRequest request, QuestionAnswer answer) {
+        question.setBankId(request.bankId());
+        question.setQuestionType(request.questionType());
+        question.setStem(request.stem().trim());
+        question.setAnswerJson(writeAnswer(answer));
+        question.setAnswerText(request.questionType() == QuestionType.SHORT_ANSWER
+                ? answer.acceptedAnswers().get(0).get(0)
+                : null);
+        question.setAnalysis(normalize(request.analysis()));
+        question.setDefaultScore(request.defaultScore());
+        question.setFillBlankAutoGradable(
+                request.questionType() == QuestionType.FILL_BLANK
+                        && Boolean.TRUE.equals(request.fillBlankAutoGradable())
+        );
+        question.setCaseSensitive(
+                request.questionType() == QuestionType.FILL_BLANK
+                        && Boolean.TRUE.equals(request.caseSensitive())
+        );
+    }
+
+    private NormalizedQuestion validateAndNormalize(QuestionWriteRequest request) {
+        QuestionAnswer answer = normalizeAnswer(request.answer());
+        List<QuestionOptionWriteRequest> options = normalizeOptions(request.options());
+
+        return switch (request.questionType()) {
+            case SINGLE_CHOICE -> validateSingleChoice(answer, options);
+            case MULTIPLE_CHOICE -> validateMultipleChoice(answer, options);
+            case TRUE_FALSE -> validateTrueFalse(answer, options);
+            case FILL_BLANK -> validateFillBlank(answer, options);
+            case SHORT_ANSWER -> validateShortAnswer(answer, options);
+        };
+    }
+
+    private NormalizedQuestion validateSingleChoice(
+            QuestionAnswer answer,
+            List<QuestionOptionWriteRequest> options
+    ) {
+        validateChoiceOptions(options);
+        if (answer.acceptedAnswers().size() != 1
+                || answer.acceptedAnswers().get(0).size() != 1) {
+            throw invalidAnswer("单选题必须且只能有一个正确选项");
+        }
+        Set<String> correctKeys = normalizeAndValidateChoiceKeys(answer, options);
+        return new NormalizedQuestion(options, answerWithKeys(correctKeys), correctKeys);
+    }
+
+    private NormalizedQuestion validateMultipleChoice(
+            QuestionAnswer answer,
+            List<QuestionOptionWriteRequest> options
+    ) {
+        validateChoiceOptions(options);
+        if (answer.acceptedAnswers().size() != 1
+                || answer.acceptedAnswers().get(0).isEmpty()) {
+            throw invalidAnswer("多选题至少需要一个正确选项");
+        }
+        Set<String> correctKeys = normalizeAndValidateChoiceKeys(answer, options);
+        return new NormalizedQuestion(options, answerWithKeys(correctKeys), correctKeys);
+    }
+
+    private NormalizedQuestion validateTrueFalse(
+            QuestionAnswer answer,
+            List<QuestionOptionWriteRequest> options
+    ) {
+        if (!options.isEmpty()) {
+            throw invalidAnswer("判断题选项由系统生成，不需要提交options");
+        }
+        if (answer.acceptedAnswers().size() != 1
+                || answer.acceptedAnswers().get(0).size() != 1) {
+            throw invalidAnswer("判断题答案必须是TRUE或FALSE");
+        }
+        String value = answer.acceptedAnswers().get(0).get(0).toUpperCase(Locale.ROOT);
+        if (!value.equals("TRUE") && !value.equals("FALSE")) {
+            throw invalidAnswer("判断题答案必须是TRUE或FALSE");
+        }
+        List<QuestionOptionWriteRequest> generated = List.of(
+                new QuestionOptionWriteRequest("TRUE", "正确", 0),
+                new QuestionOptionWriteRequest("FALSE", "错误", 1)
+        );
+        Set<String> correctKeys = Set.of(value);
+        return new NormalizedQuestion(generated, answerWithKeys(correctKeys), correctKeys);
+    }
+
+    private NormalizedQuestion validateFillBlank(
+            QuestionAnswer answer,
+            List<QuestionOptionWriteRequest> options
+    ) {
+        requireNoOptions(options, "填空题");
+        if (answer.acceptedAnswers().isEmpty()) {
+            throw invalidAnswer("填空题至少需要一个空的答案");
+        }
+        return new NormalizedQuestion(options, answer, Set.of());
+    }
+
+    private NormalizedQuestion validateShortAnswer(
+            QuestionAnswer answer,
+            List<QuestionOptionWriteRequest> options
+    ) {
+        requireNoOptions(options, "简答题");
+        if (answer.acceptedAnswers().size() != 1
+                || answer.acceptedAnswers().get(0).size() != 1) {
+            throw invalidAnswer("简答题必须提供一份参考答案");
+        }
+        return new NormalizedQuestion(options, answer, Set.of());
+    }
+
+    private QuestionAnswer normalizeAnswer(QuestionAnswer answer) {
+        if (answer == null || answer.acceptedAnswers() == null) {
+            throw invalidAnswer("正确答案不能为空");
+        }
+        List<List<String>> groups = new ArrayList<>();
+        for (List<String> group : answer.acceptedAnswers()) {
+            if (group == null || group.isEmpty()) {
+                throw invalidAnswer("答案组不能为空");
+            }
+            LinkedHashSet<String> values = new LinkedHashSet<>();
+            for (String value : group) {
+                if (value == null || value.isBlank()) {
+                    throw invalidAnswer("答案内容不能为空");
+                }
+                String normalized = value.trim();
+                if (normalized.length() > 4000) {
+                    throw invalidAnswer("单个答案不能超过4000个字符");
+                }
+                values.add(normalized);
+            }
+            groups.add(List.copyOf(values));
+        }
+        return new QuestionAnswer(groups);
+    }
+
+    private List<QuestionOptionWriteRequest> normalizeOptions(
+            List<QuestionOptionWriteRequest> requestedOptions
+    ) {
+        if (requestedOptions == null) {
+            return List.of();
+        }
+        List<QuestionOptionWriteRequest> result = new ArrayList<>();
+        Set<String> keys = new HashSet<>();
+        for (int index = 0; index < requestedOptions.size(); index++) {
+            QuestionOptionWriteRequest option = requestedOptions.get(index);
+            String key = option.key().trim().toUpperCase(Locale.ROOT);
+            if (!keys.add(key)) {
+                throw invalidAnswer("选项标识不能重复");
+            }
+            result.add(new QuestionOptionWriteRequest(
+                    key,
+                    option.text().trim(),
+                    option.sortOrder() == null ? index : option.sortOrder()
+            ));
+        }
+        return List.copyOf(result);
+    }
+
+    private void validateChoiceOptions(List<QuestionOptionWriteRequest> options) {
+        if (options.size() < MIN_CHOICE_OPTIONS) {
+            throw invalidAnswer("选择题至少需要两个选项");
+        }
+    }
+
+    private Set<String> normalizeAndValidateChoiceKeys(
+            QuestionAnswer answer,
+            List<QuestionOptionWriteRequest> options
+    ) {
+        Set<String> optionKeys = options.stream()
+                .map(QuestionOptionWriteRequest::key)
+                .collect(java.util.stream.Collectors.toSet());
+        LinkedHashSet<String> correctKeys = new LinkedHashSet<>();
+        for (String key : answer.acceptedAnswers().get(0)) {
+            String normalized = key.toUpperCase(Locale.ROOT);
+            if (!optionKeys.contains(normalized)) {
+                throw invalidAnswer("正确答案引用了不存在的选项：" + normalized);
+            }
+            correctKeys.add(normalized);
+        }
+        return Set.copyOf(correctKeys);
+    }
+
+    private QuestionAnswer answerWithKeys(Set<String> correctKeys) {
+        List<String> sorted = correctKeys.stream().sorted().toList();
+        return new QuestionAnswer(List.of(sorted));
+    }
+
+    private void requireNoOptions(List<QuestionOptionWriteRequest> options, String typeName) {
+        if (!options.isEmpty()) {
+            throw invalidAnswer(typeName + "不能包含选项");
+        }
+    }
+
+    private void replaceOptions(
+            Long questionId,
+            List<QuestionOptionWriteRequest> options,
+            Set<String> correctKeys
+    ) {
+        optionMapper.deleteByQuestionId(questionId);
+        for (QuestionOptionWriteRequest request : options) {
+            QuestionOption option = new QuestionOption();
+            option.setQuestionId(questionId);
+            option.setOptionKey(request.key());
+            option.setOptionText(request.text());
+            option.setCorrect(correctKeys.contains(request.key()));
+            option.setSortOrder(request.sortOrder());
+            if (optionMapper.insert(option) != 1) {
+                throw new BusinessException(ErrorCode.INTERNAL_ERROR, "保存题目选项失败");
+            }
+        }
+    }
+
+    private QuestionManagementResponse managementResponse(Question question) {
+        return new QuestionManagementResponse(
+                question.getId(),
+                question.getBankId(),
+                question.getCreatorId(),
+                question.getQuestionType(),
+                question.getStem(),
+                safeOptions(question.getId()),
+                readAnswer(question.getAnswerJson()),
+                question.getAnalysis(),
+                question.getDefaultScore(),
+                Boolean.TRUE.equals(question.getFillBlankAutoGradable()),
+                Boolean.TRUE.equals(question.getCaseSensitive()),
+                question.getStatus(),
+                question.getCreatedAt(),
+                question.getUpdatedAt()
+        );
+    }
+
+    private List<QuestionOptionResponse> safeOptions(Long questionId) {
+        return optionMapper.findByQuestionId(questionId).stream()
+                .map(QuestionOptionResponse::from)
+                .toList();
+    }
+
+    private String writeAnswer(QuestionAnswer answer) {
+        try {
+            return objectMapper.writeValueAsString(answer);
+        } catch (JsonProcessingException exception) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "正确答案序列化失败");
+        }
+    }
+
+    private QuestionAnswer readAnswer(String answerJson) {
+        try {
+            return objectMapper.readValue(answerJson, QuestionAnswer.class);
+        } catch (JsonProcessingException exception) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "题目答案数据格式损坏");
+        }
+    }
+
+    private String normalize(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private BusinessException invalidAnswer(String message) {
+        return new BusinessException(ErrorCode.BAD_REQUEST, message);
+    }
+
+    private record NormalizedQuestion(
+            List<QuestionOptionWriteRequest> options,
+            QuestionAnswer answer,
+            Set<String> correctOptionKeys
+    ) {
+    }
+}

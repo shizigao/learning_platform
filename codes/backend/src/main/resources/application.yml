@@ -1,0 +1,90 @@
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+spring:
+  application:
+    name: learning-platform-backend
+  profiles:
+    active: ${APP_ENV:local}
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/learning_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${DB_USERNAME:learning_platform}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 3s
+  servlet:
+    multipart:
+      max-file-size: 200MB
+      max-request-size: 220MB
+  jackson:
+    time-zone: Asia/Shanghai
+    default-property-inclusion: non_null
+
+mybatis:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    default-fetch-size: 100
+    default-statement-timeout: 30
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState,ping
+        readiness:
+          include: readinessState,db,redis,minio
+
+app:
+  environment: ${APP_ENV:local}
+  exam:
+    runtime-cache-enabled: ${EXAM_RUNTIME_CACHE_ENABLED:true}
+    timeout-scan-ms: ${EXAM_TIMEOUT_SCAN_MS:5000}
+    timeout-scan-initial-delay-ms: ${EXAM_TIMEOUT_SCAN_INITIAL_DELAY_MS:5000}
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  security:
+    jwt:
+      secret: ${JWT_SECRET:}
+      access-token-ttl: ${JWT_ACCESS_TOKEN_TTL_MINUTES:120}m
+    login-protection:
+      enabled: ${LOGIN_PROTECTION_ENABLED:true}
+      max-account-failures: ${LOGIN_MAX_ACCOUNT_FAILURES:5}
+      max-ip-failures: ${LOGIN_MAX_IP_FAILURES:20}
+      window: ${LOGIN_PROTECTION_WINDOW_MINUTES:15}m
+  storage:
+    minio:
+      endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+      access-key: ${MINIO_ACCESS_KEY:}
+      secret-key: ${MINIO_SECRET_KEY:}
+      bucket: ${MINIO_BUCKET:learning-platform}
+  upload:
+    max-file-size: ${UPLOAD_MAX_FILE_SIZE:200MB}
+    max-files-per-content: ${UPLOAD_MAX_FILES_PER_CONTENT:20}
+    signed-url-ttl: ${UPLOAD_SIGNED_URL_TTL_MINUTES:10}m
+  ai:
+    provider: ${AI_PROVIDER:mock}
+    deepseek:
+      base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+      api-key: ${DEEPSEEK_API_KEY:}
+      model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
+      timeout: ${DEEPSEEK_TIMEOUT_SECONDS:60}s

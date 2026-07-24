@@ -1,0 +1,70 @@
+# Operating system
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDEs and editors
+.idea/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+**/.vscode/*
+!**/.vscode/extensions.json
+
+# Java / Maven
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+
+# Node / Vite
+**/node_modules/
+**/dist/
+**/dist-ssr/
+*.tsbuildinfo
+
+# Logs and runtime files
+logs/
+**/logs/
+*.log
+*.pid
+*.tmp
+*.temp
+.local-data/
+uploads/
+
+# Local environment files (examples remain tracked)
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Spring Boot private configuration
+**/application-local.yml
+**/application-local.yaml
+**/application-prod.yml
+**/application-prod.yaml
+**/application-*.local.yml
+**/application-*.local.yaml
+
+# Credentials and certificates
+数据库密码（开发使用）.txt
+*.jks
+*.p12
+*.pfx
+*.pem
+*.key
+
+# Test and coverage output
+coverage/
+**/coverage/
+**/test-results/
+**/playwright-report/
+

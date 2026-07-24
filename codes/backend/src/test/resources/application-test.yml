@@ -1,0 +1,43 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:learning_platform_test;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+app:
+  exam:
+    runtime-cache-enabled: false
+    timeout-scan-ms: 3600000
+    timeout-scan-initial-delay-ms: 3600000
+  security:
+    jwt:
+      secret: test-only-secret-with-at-least-thirty-two-bytes
+      access-token-ttl: 120m
+    login-protection:
+      enabled: false
+      max-account-failures: 5
+      max-ip-failures: 20
+      window: 15m
+  storage:
+    minio:
+      endpoint: http://localhost:9000
+      access-key: test-access-key
+      secret-key: test-secret-key
+      bucket: learning-platform-test
+  upload:
+    max-file-size: 200MB
+    max-files-per-content: 20
+    signed-url-ttl: 10m
+  ai:
+    provider: mock
+    deepseek:
+      base-url: https://api.deepseek.com
+      api-key: ""
+      model: deepseek-v4-flash
+      timeout: 5s
+
