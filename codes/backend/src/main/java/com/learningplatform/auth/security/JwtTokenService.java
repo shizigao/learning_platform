@@ -51,11 +51,18 @@ public class JwtTokenService {
                 || claims.getIssuedAt() == null || claims.getExpiration() == null) {
             throw new IllegalArgumentException("JWT required claims are missing");
         }
+        Instant issuedAt = claims.getIssuedAt().toInstant();
+        Instant expiresAt = claims.getExpiration().toInstant();
+        if (userId <= 0
+                || !expiresAt.isAfter(issuedAt)
+                || issuedAt.isAfter(Instant.now().plusSeconds(60))) {
+            throw new IllegalArgumentException("JWT claims are invalid");
+        }
         return new JwtTokenClaims(
                 userId,
                 username,
-                claims.getIssuedAt().toInstant(),
-                claims.getExpiration().toInstant()
+                issuedAt,
+                expiresAt
         );
     }
 

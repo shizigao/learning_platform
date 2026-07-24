@@ -285,6 +285,98 @@ class ContentControllerIntegrationTests {
                 .andExpect(jsonPath("$.data.total").value(1));
     }
 
+    @Test
+    void parameterizesInjectionLikeSearchInput() throws Exception {
+        MvcResult createResult = mockMvc.perform(
+                        post("/api/publisher/contents")
+                                .header(
+                                        AUTHORIZATION,
+                                        bearer(publisherToken)
+                                )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(contentJson())
+                )
+                .andExpect(status().isOk())
+                .andReturn();
+        long contentId = responseData(createResult).path("id").asLong();
+        mockMvc.perform(post(
+                        "/api/publisher/contents/{id}/submit",
+                        contentId
+                ).header(AUTHORIZATION, bearer(publisherToken)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(
+                        "/api/admin/contents/{id}/approve",
+                        contentId
+                ).header(AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/contents")
+                        .header(AUTHORIZATION, bearer(userToken))
+                        .param("keyword", "%' OR 1=1 --"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(0));
+
+        mockMvc.perform(get("/api/contents")
+                        .header(AUTHORIZATION, bearer(userToken))
+                        .param("keyword", "Spring"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].id")
+                        .value(contentId));
+    }
+
+    @Test
+    void takesContentOfflineAndRevokesAllUserFacingAccess()
+            throws Exception {
+        MvcResult createResult = mockMvc.perform(
+                        post("/api/publisher/contents")
+                                .header(
+                                        AUTHORIZATION,
+                                        bearer(publisherToken)
+                                )
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(contentJson())
+                )
+                .andExpect(status().isOk())
+                .andReturn();
+        long contentId = responseData(createResult).path("id").asLong();
+        mockMvc.perform(post(
+                        "/api/publisher/contents/{id}/submit",
+                        contentId
+                ).header(AUTHORIZATION, bearer(publisherToken)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(
+                        "/api/admin/contents/{id}/approve",
+                        contentId
+                ).header(AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/contents/{id}", contentId)
+                        .header(AUTHORIZATION, bearer(userToken)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(
+                        "/api/admin/contents/{id}/offline",
+                        contentId
+                ).header(AUTHORIZATION, bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("OFFLINE"));
+
+        mockMvc.perform(get("/api/contents/{id}", contentId)
+                        .header(AUTHORIZATION, bearer(userToken)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value(40400));
+        mockMvc.perform(post(
+                        "/api/learning/contents/{id}/start",
+                        contentId
+                ).header(AUTHORIZATION, bearer(userToken)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/contents")
+                        .header(AUTHORIZATION, bearer(userToken))
+                        .param("keyword", "Spring"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(0));
+    }
+
     private String contentJson() throws Exception {
         return objectMapper.writeValueAsString(Map.of(
                 "categoryId", categoryId,

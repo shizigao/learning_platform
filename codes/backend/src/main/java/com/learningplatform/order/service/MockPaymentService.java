@@ -59,6 +59,7 @@ public class MockPaymentService {
         if (order.getExpiresAt() != null && !paidAt.isBefore(order.getExpiresAt())) {
             throw new BusinessException(ErrorCode.CONFLICT, "订单已超过支付期限");
         }
+        orderService.assertContentPaymentAllowed(orderId, userId);
 
         PaymentRecord payment = new PaymentRecord();
         payment.setPaymentNo(numberGenerator.nextPaymentNo());

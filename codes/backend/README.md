@@ -18,3 +18,6 @@ mvn spring-boot:run
 
 默认健康检查：`GET http://localhost:8080/api/health`。
 
+完整的环境搭建、数据库及基础设施初始化见项目根目录
+[`README.md`](../README.md)，生产发布见
+[`项目部署.md`](../项目部署.md)。

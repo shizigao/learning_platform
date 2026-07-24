@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
+import java.io.BufferedInputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -28,6 +29,7 @@ public class MinioStorageService {
     private final MinioProperties minioProperties;
     private final UploadProperties uploadProperties;
     private final FileUploadValidator uploadValidator;
+    private final FileContentSignatureValidator signatureValidator;
     private final StorageObjectKeyFactory objectKeyFactory;
 
     public MinioStorageService(
@@ -35,12 +37,14 @@ public class MinioStorageService {
             MinioProperties minioProperties,
             UploadProperties uploadProperties,
             FileUploadValidator uploadValidator,
+            FileContentSignatureValidator signatureValidator,
             StorageObjectKeyFactory objectKeyFactory
     ) {
         this.minioClient = minioClient;
         this.minioProperties = minioProperties;
         this.uploadProperties = uploadProperties;
         this.uploadValidator = uploadValidator;
+        this.signatureValidator = signatureValidator;
         this.objectKeyFactory = objectKeyFactory;
     }
 
@@ -50,12 +54,17 @@ public class MinioStorageService {
         }
         ValidatedUploadFile file = uploadValidator.validate(request.toValidationRequest());
         String objectName = objectKeyFactory.create(request.resourceOwnerId(), file.extension());
-        try {
+        try (BufferedInputStream input =
+                     new BufferedInputStream(request.inputStream())) {
+            input.mark(512);
+            byte[] header = input.readNBytes(512);
+            input.reset();
+            signatureValidator.validate(file.extension(), header);
             minioClient.putObject(
                     PutObjectArgs.builder()
                             .bucket(minioProperties.bucket())
                             .object(objectName)
-                            .stream(request.inputStream(), file.sizeBytes(), -1L)
+                            .stream(input, file.sizeBytes(), -1L)
                             .contentType(file.mimeType())
                             .build()
             );
@@ -74,6 +83,15 @@ public class MinioStorageService {
 
     public InputStream download(String objectName, long requesterUserId, boolean requesterAdmin) {
         objectKeyFactory.assertCanAccess(objectName, requesterUserId, requesterAdmin);
+        return getObject(objectName);
+    }
+
+    public InputStream downloadAuthorized(String objectName) {
+        objectKeyFactory.ownerId(objectName);
+        return getObject(objectName);
+    }
+
+    private InputStream getObject(String objectName) {
         try {
             return minioClient.getObject(
                     GetObjectArgs.builder()

@@ -13,6 +13,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -60,6 +61,17 @@ public class GlobalExceptionHandler {
         ErrorCode errorCode = ErrorCode.BAD_REQUEST;
         return ResponseEntity.status(errorCode.getHttpStatus())
                 .body(ApiResponse.failure(errorCode));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSizeExceededException(
+            MaxUploadSizeExceededException exception) {
+        ErrorCode errorCode = ErrorCode.PAYLOAD_TOO_LARGE;
+        return ResponseEntity.status(errorCode.getHttpStatus())
+                .body(ApiResponse.failure(
+                        errorCode,
+                        "上传文件大小超出服务器限制，请选择符合页面大小限制的文件"
+                ));
     }
 
     @ExceptionHandler(Exception.class)

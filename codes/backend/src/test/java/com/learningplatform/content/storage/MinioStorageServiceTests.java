@@ -48,6 +48,7 @@ class MinioStorageServiceTests {
                 ),
                 uploadProperties,
                 new FileUploadValidator(uploadProperties),
+                new FileContentSignatureValidator(),
                 new StorageObjectKeyFactory()
         );
     }
@@ -58,13 +59,16 @@ class MinioStorageServiceTests {
                 ContentFileRole.COVER,
                 "cover.png",
                 "image/png",
-                4,
+                8,
                 0,
                 0,
                 7,
                 7,
                 false,
-                new ByteArrayInputStream(new byte[]{1, 2, 3, 4})
+                new ByteArrayInputStream(new byte[]{
+                        (byte) 0x89, 0x50, 0x4E, 0x47,
+                        0x0D, 0x0A, 0x1A, 0x0A
+                })
         ));
 
         assertThat(stored.bucketName()).isEqualTo("learning-platform-test");

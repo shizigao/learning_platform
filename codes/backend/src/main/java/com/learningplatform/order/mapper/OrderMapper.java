@@ -64,6 +64,28 @@ public interface OrderMapper {
     );
 
     @Select("""
+            SELECT COUNT(*) > 0
+            FROM orders o
+            INNER JOIN order_item oi ON oi.order_id = o.id
+            WHERE o.user_id = #{userId}
+              AND oi.product_type_snapshot = 'CONTENT'
+              AND oi.resource_id_snapshot = #{resourceId}
+              AND (#{excludedOrderId} IS NULL OR o.id <> #{excludedOrderId})
+              AND (
+                    o.status = 'PAID'
+                    OR (
+                        o.status = 'PENDING_PAYMENT'
+                        AND (o.expires_at IS NULL OR o.expires_at > CURRENT_TIMESTAMP)
+                    )
+                  )
+            """)
+    boolean existsBlockingContentOrder(
+            @Param("userId") Long userId,
+            @Param("resourceId") Long resourceId,
+            @Param("excludedOrderId") Long excludedOrderId
+    );
+
+    @Select("""
             <script>
             SELECT
             """ + COLUMNS + """

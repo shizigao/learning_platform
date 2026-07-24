@@ -4,5 +4,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app.storage.minio")
 public record MinioProperties(String endpoint, String accessKey, String secretKey, String bucket) {
+    @Override
+    public String toString() {
+        return "MinioProperties[endpoint=" + endpoint
+                + ", accessKey=[REDACTED], secretKey=[REDACTED], bucket="
+                + bucket + "]";
+    }
 }
-

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChatDotRound, Download, Lock, Star, StarFilled, VideoPlay } from '@element-plus/icons-vue'
+import { ChatDotRound, Download, Lock, MagicStick, Star, StarFilled, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -162,6 +162,12 @@ onMounted(load)
           <el-button v-else type="warning" size="large" @click="purchase">
             前往模拟购买（不真实扣款）
           </el-button>
+          <RouterLink
+            v-if="detail.hasAccess"
+            :to="{ path: '/ai-assistant', query: { contentId } }"
+          >
+            <el-button size="large" :icon="MagicStick">使用 AI 学习助手</el-button>
+          </RouterLink>
           <div class="reaction-actions">
             <el-button :type="reaction.liked ? 'primary' : 'default'" :icon="ThumbUpIcon" @click="toggleLike">{{ reaction.liked ? '已点赞' : '点赞' }}</el-button>
             <el-button :type="reaction.favorited ? 'primary' : 'default'" :icon="reaction.favorited ? StarFilled : Star" @click="toggleFavorite">{{ reaction.favorited ? '已收藏' : '收藏' }}</el-button>
@@ -201,7 +207,7 @@ h1 { margin: 18px 0 12px; font-size: clamp(28px, 4vw, 40px); letter-spacing: -.0
 .locked-panel .el-icon { font-size: 30px; }.locked-panel p { margin: 5px 0 0; font-size: 13px; }
 .action-card { position: sticky; top: 94px; padding: 26px; }
 .action-card .price { color: var(--lp-primary); font-size: 28px; font-weight: 800; }
-.action-card > p { color: var(--lp-text-secondary); font-size: 13px; line-height: 1.7; }.action-card > .el-button { width: 100%; margin-top: 18px; }
+.action-card > p { color: var(--lp-text-secondary); font-size: 13px; line-height: 1.7; }.action-card > .el-button, .action-card > a { display: block; width: 100%; margin-top: 18px; }.action-card > a .el-button { width: 100%; }
 .reaction-actions { display: grid; gap: 8px; margin-top: 12px; grid-template-columns: 1fr 1fr; }.reaction-actions .el-button { margin: 0; }
 .files { margin-top: 30px; }.files h2, .comment-card h2 { font-size: 18px; }
 .file-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--lp-border); padding: 14px 0; }.file-row small { display: block; margin-top: 5px; color: #98a2b3; }

@@ -38,6 +38,13 @@ mybatis:
     default-fetch-size: 100
     default-statement-timeout: 30
 
+logging:
+  level:
+    # Spring MVC 在 DEBUG/TRACE 下会调用请求和响应对象的 toString，
+    # 登录、AI 提问等接口可能因此泄露密码、JWT 或用户正文。
+    org.springframework.web.servlet.mvc.method.annotation.RequestResponseBodyMethodProcessor: INFO
+    org.springframework.web.servlet.mvc.method.annotation.HttpEntityMethodProcessor: INFO
+
 management:
   endpoints:
     web:
@@ -71,6 +78,11 @@ app:
       max-account-failures: ${LOGIN_MAX_ACCOUNT_FAILURES:5}
       max-ip-failures: ${LOGIN_MAX_IP_FAILURES:20}
       window: ${LOGIN_PROTECTION_WINDOW_MINUTES:15}m
+    rate-limit:
+      enabled: ${API_RATE_LIMIT_ENABLED:true}
+      general-requests-per-minute: ${API_GENERAL_REQUESTS_PER_MINUTE:600}
+      auth-requests-per-minute: ${API_AUTH_REQUESTS_PER_MINUTE:30}
+      upload-requests-per-minute: ${API_UPLOAD_REQUESTS_PER_MINUTE:30}
   storage:
     minio:
       endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
@@ -83,8 +95,22 @@ app:
     signed-url-ttl: ${UPLOAD_SIGNED_URL_TTL_MINUTES:10}m
   ai:
     provider: ${AI_PROVIDER:mock}
+    limits:
+      max-input-chars: ${AI_MAX_INPUT_CHARS:100000}
+      max-context-messages: ${AI_MAX_CONTEXT_MESSAGES:10}
+      max-context-chars: ${AI_MAX_CONTEXT_CHARS:20000}
+      requests-per-window: ${AI_REQUESTS_PER_WINDOW:10}
+      rate-window: ${AI_RATE_WINDOW_SECONDS:60}s
+      max-concurrent-per-user: ${AI_MAX_CONCURRENT_PER_USER:1}
+      timeout: ${AI_REQUEST_TIMEOUT_SECONDS:630}s
+    mock:
+      model: ${AI_MOCK_MODEL:mock-learning-assistant-v1}
+      scenario: ${AI_MOCK_SCENARIO:success}
+      delay: ${AI_MOCK_DELAY_MILLIS:0}ms
     deepseek:
       base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
       api-key: ${DEEPSEEK_API_KEY:}
       model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
-      timeout: ${DEEPSEEK_TIMEOUT_SECONDS:60}s
+      connect-timeout: ${DEEPSEEK_CONNECT_TIMEOUT_SECONDS:10}s
+      timeout: ${DEEPSEEK_TIMEOUT_SECONDS:620}s
+      thinking-enabled: ${DEEPSEEK_THINKING_ENABLED:false}

@@ -152,6 +152,7 @@ export async function uploadContentFile(
     await http.post<ApiResponse<ContentFile>>(`/publisher/contents/${contentId}/files`, formData, {
       params: { fileRole, sortOrder },
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 10 * 60 * 1000,
     }),
   )
 }

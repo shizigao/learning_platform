@@ -78,7 +78,12 @@ http.interceptors.response.use(
     }
     const body = error.response?.data
     const apiBody = typeof body === 'object' && body !== null ? body : undefined
+    const payloadTooLargeMessage =
+      error.response?.status === 413
+        ? '上传文件大小超出服务器限制，请选择符合页面大小限制的文件'
+        : undefined
     const responseMessage =
+      payloadTooLargeMessage ||
       apiBody?.message ||
       (typeof body === 'string' && body.trim() ? body.trim() : undefined) ||
       (error.response ? `请求失败（HTTP ${error.response.status}）` : undefined)

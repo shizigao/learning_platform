@@ -129,6 +129,43 @@ public interface ExamMapper {
     );
 
     @Select("""
+            <script>
+            SELECT COUNT(*)
+            FROM exam e
+            WHERE e.deleted = 0
+            <if test='publisherId != null'>AND e.publisher_id = #{publisherId}</if>
+            <if test='status != null'>AND e.status = #{status}</if>
+            <if test='keyword != null'>AND e.name LIKE CONCAT('%', #{keyword}, '%')</if>
+            </script>
+            """)
+    long countForAdmin(
+            @Param("publisherId") Long publisherId,
+            @Param("status") ExamStatus status,
+            @Param("keyword") String keyword
+    );
+
+    @Select("""
+            <script>
+            SELECT
+            """ + COLUMNS + """
+            FROM exam e
+            WHERE e.deleted = 0
+            <if test='publisherId != null'>AND e.publisher_id = #{publisherId}</if>
+            <if test='status != null'>AND e.status = #{status}</if>
+            <if test='keyword != null'>AND e.name LIKE CONCAT('%', #{keyword}, '%')</if>
+            ORDER BY e.updated_at DESC, e.id DESC
+            LIMIT #{limit} OFFSET #{offset}
+            </script>
+            """)
+    List<Exam> findForAdmin(
+            @Param("publisherId") Long publisherId,
+            @Param("status") ExamStatus status,
+            @Param("keyword") String keyword,
+            @Param("offset") long offset,
+            @Param("limit") int limit
+    );
+
+    @Select("""
             SELECT
             """ + COLUMNS + """
             FROM exam e

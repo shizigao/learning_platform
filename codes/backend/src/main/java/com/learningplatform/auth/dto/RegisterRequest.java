@@ -25,4 +25,10 @@ public record RegisterRequest(
         @Pattern(regexp = "^$|^\\+?[0-9]{6,20}$", message = "手机号格式不正确")
         String phone
 ) {
+    @Override
+    public String toString() {
+        return "RegisterRequest[username=" + username
+                + ", password=[REDACTED], nickname=" + nickname
+                + ", email=" + email + ", phone=" + phone + "]";
+    }
 }

@@ -3,6 +3,14 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { onMounted, reactive, ref } from 'vue'
 
 import {
+  getAdminExam,
+  listAdminExams,
+  listAdminUsers,
+  listOperationLogs,
+  updateAdminUserRoles,
+  updateAdminUserStatus,
+} from '@/api/admin'
+import {
   approveContent,
   createCategory,
   deleteCategory,
@@ -17,6 +25,14 @@ import {
 import { getAdminOrder, listAdminOrders } from '@/api/order'
 import ContentStatusTag from '@/components/ContentStatusTag.vue'
 import SectionPageHeader from '@/components/SectionPageHeader.vue'
+import type {
+  AdminExamDetail,
+  AdminExamSummary,
+  AdminUser,
+  OperationLog,
+  OperationResult,
+} from '@/types/admin'
+import type { RoleCode, UserStatus } from '@/types/auth'
 import type {
   CategoryWritePayload,
   ContentCategory,
@@ -72,6 +88,69 @@ const orderStatusLabels: Record<OrderStatus, string> = {
   CANCELLED: '已取消',
   CLOSED: '已关闭',
   REFUNDED: '已退款',
+}
+const userLoading = ref(false)
+const users = ref<AdminUser[]>([])
+const userTotal = ref(0)
+const userFilters = reactive({
+  keyword: '',
+  status: undefined as UserStatus | undefined,
+  role: undefined as RoleCode | undefined,
+  pageNumber: 1,
+  pageSize: 10,
+})
+const roleDialogVisible = ref(false)
+const roleSaving = ref(false)
+const editingUser = ref<AdminUser>()
+const selectedRoles = ref<RoleCode[]>([])
+const roleLabels: Record<RoleCode, string> = {
+  USER: '普通用户',
+  PUBLISHER: '发布者',
+  ADMIN: '管理员',
+}
+const userStatusLabels: Record<UserStatus, string> = {
+  ACTIVE: '正常',
+  DISABLED: '已禁用',
+  LOCKED: '已锁定',
+}
+const examLoading = ref(false)
+const exams = ref<AdminExamSummary[]>([])
+const examTotal = ref(0)
+const examFilters = reactive({
+  keyword: '',
+  publisherId: undefined as number | undefined,
+  status: undefined as import('@/types/exam').ExamStatus | undefined,
+  pageNumber: 1,
+  pageSize: 10,
+})
+const examPreviewVisible = ref(false)
+const examPreviewLoading = ref(false)
+const examPreview = ref<AdminExamDetail>()
+const examStatusLabels: Record<import('@/types/exam').ExamStatus, string> = {
+  DRAFT: '草稿',
+  PUBLISHED: '已发布',
+  ONGOING: '进行中',
+  FINISHED: '已结束',
+  CANCELLED: '已取消',
+}
+const auditLoading = ref(false)
+const operationLogs = ref<OperationLog[]>([])
+const auditTotal = ref(0)
+const auditFilters = reactive({
+  module: '',
+  action: '',
+  result: undefined as OperationResult | undefined,
+  requestId: '',
+  pageNumber: 1,
+  pageSize: 10,
+})
+const auditModuleLabels: Record<string, string> = {
+  AUTH: '登录认证',
+  USER: '用户与角色',
+  CONTENT: '资料审核',
+  ORDER: '订单权益',
+  EXAM: '考试发布',
+  GRADING: '人工阅卷',
 }
 
 async function loadReviews(): Promise<void> {
@@ -229,6 +308,117 @@ async function loadOrders(): Promise<void> {
   }
 }
 
+async function loadUsers(): Promise<void> {
+  userLoading.value = true
+  try {
+    const page = await listAdminUsers({
+      ...userFilters,
+      keyword: userFilters.keyword.trim() || undefined,
+    })
+    users.value = page.items
+    userTotal.value = page.total
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '用户列表加载失败')
+  } finally {
+    userLoading.value = false
+  }
+}
+
+function searchUsers(): void {
+  userFilters.pageNumber = 1
+  void loadUsers()
+}
+
+async function changeUserStatus(user: AdminUser): Promise<void> {
+  const nextStatus: UserStatus = user.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE'
+  const disabling = nextStatus === 'DISABLED'
+  try {
+    await ElMessageBox.confirm(
+      disabling
+        ? `禁用“${user.username}”后，其现有登录状态将立即失效。确认继续吗？`
+        : `确认重新启用“${user.username}”吗？`,
+      disabling ? '禁用账号' : '启用账号',
+      { type: disabling ? 'warning' : 'success' },
+    )
+    await updateAdminUserStatus(user.id, nextStatus)
+    ElMessage.success(disabling ? '账号已禁用' : '账号已启用')
+    await loadUsers()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error instanceof Error ? error.message : '账号状态更新失败')
+    }
+  }
+}
+
+function openRoleDialog(user: AdminUser): void {
+  editingUser.value = user
+  selectedRoles.value = [...user.roles]
+  roleDialogVisible.value = true
+}
+
+async function saveRoles(): Promise<void> {
+  if (!editingUser.value || selectedRoles.value.length === 0) {
+    ElMessage.warning('用户至少需要保留一个角色')
+    return
+  }
+  try {
+    const roleNames = selectedRoles.value.map((role) => roleLabels[role]).join('、')
+    await ElMessageBox.confirm(
+      `确定将“${editingUser.value.username}”的角色替换为：${roleNames}？权限变更会立即生效。`,
+      '确认分配角色',
+      {
+        type: selectedRoles.value.includes('ADMIN') ? 'warning' : 'info',
+        confirmButtonText: '确认变更',
+      },
+    )
+    roleSaving.value = true
+    await updateAdminUserRoles(editingUser.value.id, selectedRoles.value)
+    roleDialogVisible.value = false
+    ElMessage.success('用户角色已更新')
+    await loadUsers()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error instanceof Error ? error.message : '角色更新失败')
+    }
+  } finally {
+    roleSaving.value = false
+  }
+}
+
+async function loadExams(): Promise<void> {
+  examLoading.value = true
+  try {
+    const page = await listAdminExams({
+      ...examFilters,
+      keyword: examFilters.keyword.trim() || undefined,
+    })
+    exams.value = page.items
+    examTotal.value = page.total
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '考试列表加载失败')
+  } finally {
+    examLoading.value = false
+  }
+}
+
+function searchExams(): void {
+  examFilters.pageNumber = 1
+  void loadExams()
+}
+
+async function openExam(examId: number): Promise<void> {
+  examPreviewVisible.value = true
+  examPreviewLoading.value = true
+  examPreview.value = undefined
+  try {
+    examPreview.value = await getAdminExam(examId)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '考试详情加载失败')
+  } finally {
+    examPreviewLoading.value = false
+  }
+}
+
 async function openOrder(orderId: number): Promise<void> {
   orderPreviewVisible.value = true
   orderPreviewLoading.value = true
@@ -240,6 +430,29 @@ async function openOrder(orderId: number): Promise<void> {
   } finally {
     orderPreviewLoading.value = false
   }
+}
+
+async function loadOperationLogs(): Promise<void> {
+  auditLoading.value = true
+  try {
+    const page = await listOperationLogs({
+      ...auditFilters,
+      module: auditFilters.module.trim() || undefined,
+      action: auditFilters.action.trim() || undefined,
+      requestId: auditFilters.requestId.trim() || undefined,
+    })
+    operationLogs.value = page.items
+    auditTotal.value = page.total
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '操作日志加载失败')
+  } finally {
+    auditLoading.value = false
+  }
+}
+
+function searchOperationLogs(): void {
+  auditFilters.pageNumber = 1
+  void loadOperationLogs()
 }
 
 function searchOrders(): void {
@@ -260,7 +473,16 @@ function searchReviews(): void {
   void loadReviews()
 }
 
-onMounted(() => Promise.all([loadReviews(), loadCategories(), loadOrders()]))
+onMounted(() =>
+  Promise.all([
+    loadReviews(),
+    loadCategories(),
+    loadOrders(),
+    loadUsers(),
+    loadExams(),
+    loadOperationLogs(),
+  ]),
+)
 </script>
 
 <template>
@@ -269,11 +491,97 @@ onMounted(() => Promise.all([loadReviews(), loadCategories(), loadOrders()]))
       <SectionPageHeader
         eyebrow="ADMIN CONSOLE"
         title="平台管理后台"
-        description="审核学习资料、维护分类，并集中核对模拟订单、支付记录与权益来源"
-      />
+        description="统一管理用户与角色、学习资料、分类、考试、模拟订单和 AI 配置"
+      >
+        <RouterLink to="/admin/ai">
+          <el-button type="primary" plain>查看 AI 配置</el-button>
+        </RouterLink>
+      </SectionPageHeader>
 
       <div class="workspace-card">
         <el-tabs v-model="activeTab">
+          <el-tab-pane label="用户管理" name="users">
+            <div class="user-toolbar">
+              <el-input
+                v-model="userFilters.keyword"
+                clearable
+                placeholder="用户名、昵称、邮箱或手机号"
+                @keyup.enter="searchUsers"
+              />
+              <el-select v-model="userFilters.status" clearable placeholder="全部账号状态">
+                <el-option label="正常" value="ACTIVE" />
+                <el-option label="已禁用" value="DISABLED" />
+                <el-option label="已锁定" value="LOCKED" />
+              </el-select>
+              <el-select v-model="userFilters.role" clearable placeholder="全部角色">
+                <el-option label="普通用户" value="USER" />
+                <el-option label="发布者" value="PUBLISHER" />
+                <el-option label="管理员" value="ADMIN" />
+              </el-select>
+              <el-button type="primary" @click="searchUsers">查询</el-button>
+            </div>
+            <el-table v-loading="userLoading" :data="users">
+              <el-table-column label="用户" min-width="190">
+                <template #default="{ row }">
+                  <strong>{{ row.username }}</strong>
+                  <div class="table-subtitle">{{ row.nickname }}</div>
+                </template>
+              </el-table-column>
+              <el-table-column label="联系方式" min-width="210">
+                <template #default="{ row }">
+                  <div>{{ row.email || '—' }}</div>
+                  <div class="table-subtitle">{{ row.phone || '—' }}</div>
+                </template>
+              </el-table-column>
+              <el-table-column label="角色" min-width="210">
+                <template #default="{ row }">
+                  <el-tag
+                    v-for="role in row.roles"
+                    :key="role"
+                    class="role-tag"
+                    :type="role === 'ADMIN' ? 'danger' : role === 'PUBLISHER' ? 'warning' : 'info'"
+                  >
+                    {{ roleLabels[role as RoleCode] }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="状态" width="110">
+                <template #default="{ row }">
+                  <el-tag :type="row.status === 'ACTIVE' ? 'success' : 'danger'">
+                    {{ userStatusLabels[row.status as UserStatus] }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="最后登录" min-width="170">
+                <template #default="{ row }">{{ dateTime(row.lastLoginAt) }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="180" fixed="right">
+                <template #default="{ row }">
+                  <el-button link type="primary" @click="openRoleDialog(row as AdminUser)">
+                    分配角色
+                  </el-button>
+                  <el-button
+                    link
+                    :type="row.status === 'ACTIVE' ? 'danger' : 'success'"
+                    :disabled="row.status === 'LOCKED'"
+                    @click="changeUserStatus(row as AdminUser)"
+                  >
+                    {{ row.status === 'ACTIVE' ? '禁用' : '启用' }}
+                  </el-button>
+                </template>
+              </el-table-column>
+              <template #empty><el-empty description="暂无符合条件的用户" /></template>
+            </el-table>
+            <el-pagination
+              v-model:current-page="userFilters.pageNumber"
+              v-model:page-size="userFilters.pageSize"
+              background
+              layout="total, prev, pager, next"
+              :total="userTotal"
+              @current-change="loadUsers"
+            />
+          </el-tab-pane>
+
           <el-tab-pane label="资料审核" name="review">
             <div class="toolbar">
               <el-input
@@ -358,6 +666,164 @@ onMounted(() => Promise.all([loadReviews(), loadCategories(), loadOrders()]))
               </el-table-column>
               <template #empty><el-empty description="暂无分类，请先创建" /></template>
             </el-table>
+          </el-tab-pane>
+
+          <el-tab-pane label="考试查看" name="exams">
+            <div class="exam-toolbar">
+              <el-input
+                v-model="examFilters.keyword"
+                clearable
+                placeholder="搜索考试名称"
+                @keyup.enter="searchExams"
+              />
+              <el-input-number
+                v-model="examFilters.publisherId"
+                :min="1"
+                :controls="false"
+                placeholder="发布者 ID"
+              />
+              <el-select v-model="examFilters.status" clearable placeholder="全部考试状态">
+                <el-option label="草稿" value="DRAFT" />
+                <el-option label="已发布" value="PUBLISHED" />
+                <el-option label="进行中" value="ONGOING" />
+                <el-option label="已结束" value="FINISHED" />
+                <el-option label="已取消" value="CANCELLED" />
+              </el-select>
+              <el-button type="primary" @click="searchExams">查询</el-button>
+            </div>
+            <el-table v-loading="examLoading" :data="exams">
+              <el-table-column label="考试" min-width="230">
+                <template #default="{ row }">
+                  <strong>{{ row.exam.name }}</strong>
+                  <div class="table-subtitle">ID {{ row.exam.id }} · 试卷 {{ row.exam.paperId }}</div>
+                </template>
+              </el-table-column>
+              <el-table-column label="发布者" min-width="170">
+                <template #default="{ row }">
+                  {{ row.publisherNickname || row.publisherUsername }}
+                  <div class="table-subtitle">
+                    {{ row.publisherUsername }} · ID {{ row.exam.publisherId }}
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column label="状态" width="110">
+                <template #default="{ row }">
+                  <el-tag :type="row.exam.status === 'PUBLISHED' ? 'success' : 'info'">
+                    {{ examStatusLabels[row.exam.status as import('@/types/exam').ExamStatus] }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="开放时间" min-width="230">
+                <template #default="{ row }">
+                  {{ dateTime(row.exam.startAt) }}
+                  <div class="table-subtitle">至 {{ dateTime(row.exam.endAt) }}</div>
+                </template>
+              </el-table-column>
+              <el-table-column label="时长" width="100">
+                <template #default="{ row }">{{ row.exam.durationMinutes }} 分钟</template>
+              </el-table-column>
+              <el-table-column label="操作" width="90" fixed="right">
+                <template #default="{ row }">
+                  <el-button link type="primary" @click="openExam(row.exam.id)">查看</el-button>
+                </template>
+              </el-table-column>
+              <template #empty><el-empty description="暂无符合条件的考试" /></template>
+            </el-table>
+            <el-pagination
+              v-model:current-page="examFilters.pageNumber"
+              v-model:page-size="examFilters.pageSize"
+              background
+              layout="total, prev, pager, next"
+              :total="examTotal"
+              @current-change="loadExams"
+            />
+          </el-tab-pane>
+
+          <el-tab-pane label="操作日志" name="audit">
+            <div class="audit-toolbar">
+              <el-select v-model="auditFilters.module" clearable placeholder="全部模块">
+                <el-option label="登录认证" value="AUTH" />
+                <el-option label="用户与角色" value="USER" />
+                <el-option label="资料审核" value="CONTENT" />
+                <el-option label="订单权益" value="ORDER" />
+                <el-option label="考试发布" value="EXAM" />
+                <el-option label="人工阅卷" value="GRADING" />
+              </el-select>
+              <el-input
+                v-model="auditFilters.action"
+                clearable
+                placeholder="操作标识"
+                @keyup.enter="searchOperationLogs"
+              />
+              <el-select v-model="auditFilters.result" clearable placeholder="全部结果">
+                <el-option label="成功" value="SUCCESS" />
+                <el-option label="失败" value="FAILURE" />
+              </el-select>
+              <el-input
+                v-model="auditFilters.requestId"
+                clearable
+                placeholder="请求 ID"
+                @keyup.enter="searchOperationLogs"
+              />
+              <el-button type="primary" @click="searchOperationLogs">查询</el-button>
+            </div>
+            <el-alert
+              title="日志仅保存操作元数据，不记录密码、令牌和请求正文"
+              type="info"
+              show-icon
+              :closable="false"
+            />
+            <el-table v-loading="auditLoading" :data="operationLogs">
+              <el-table-column label="时间 / 操作者" min-width="190">
+                <template #default="{ row }">
+                  <strong>{{ dateTime(row.createdAt) }}</strong>
+                  <div class="table-subtitle">
+                    {{ row.operatorName || '未认证用户' }}
+                    <span v-if="row.operatorId"> · ID {{ row.operatorId }}</span>
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column label="模块 / 操作" min-width="190">
+                <template #default="{ row }">
+                  {{ auditModuleLabels[row.module] || row.module }}
+                  <div class="table-subtitle">{{ row.action }}</div>
+                </template>
+              </el-table-column>
+              <el-table-column label="目标" min-width="140">
+                <template #default="{ row }">
+                  {{ row.targetType || '—' }}
+                  <div class="table-subtitle">{{ row.targetId || '—' }}</div>
+                </template>
+              </el-table-column>
+              <el-table-column label="请求" min-width="260">
+                <template #default="{ row }">
+                  <code>{{ row.requestMethod }} {{ row.requestPath }}</code>
+                  <div class="table-subtitle">请求 ID：{{ row.requestId || '—' }}</div>
+                </template>
+              </el-table-column>
+              <el-table-column label="结果" width="120">
+                <template #default="{ row }">
+                  <el-tag :type="row.result === 'SUCCESS' ? 'success' : 'danger'">
+                    {{ row.result === 'SUCCESS' ? '成功' : '失败' }}
+                  </el-tag>
+                  <div class="table-subtitle">{{ row.durationMs }} ms</div>
+                </template>
+              </el-table-column>
+              <el-table-column label="来源" min-width="150">
+                <template #default="{ row }">
+                  {{ row.ipAddress || '—' }}
+                </template>
+              </el-table-column>
+              <template #empty><el-empty description="暂无符合条件的操作日志" /></template>
+            </el-table>
+            <el-pagination
+              v-model:current-page="auditFilters.pageNumber"
+              v-model:page-size="auditFilters.pageSize"
+              background
+              layout="total, prev, pager, next"
+              :total="auditTotal"
+              @current-change="loadOperationLogs"
+            />
           </el-tab-pane>
 
           <el-tab-pane label="订单管理" name="orders">
@@ -455,6 +921,51 @@ onMounted(() => Promise.all([loadReviews(), loadCategories(), loadOrders()]))
       </div>
     </el-drawer>
 
+    <el-drawer v-model="examPreviewVisible" title="考试详情" size="640px">
+      <div v-loading="examPreviewLoading" class="preview-content">
+        <template v-if="examPreview">
+          <el-tag>
+            {{ examStatusLabels[examPreview.management.exam.status] }}
+          </el-tag>
+          <h2>{{ examPreview.management.exam.name }}</h2>
+          <p class="summary">{{ examPreview.management.instructions || '暂无考试说明' }}</p>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="发布者">
+              {{ examPreview.publisherNickname || examPreview.publisherUsername }}
+              （{{ examPreview.publisherUsername }}）
+            </el-descriptions-item>
+            <el-descriptions-item label="试卷">
+              {{ examPreview.management.paper.name }}
+            </el-descriptions-item>
+            <el-descriptions-item label="开始时间">
+              {{ dateTime(examPreview.management.exam.startAt) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="结束时间">
+              {{ dateTime(examPreview.management.exam.endAt) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="答题时长">
+              {{ examPreview.management.exam.durationMinutes }} 分钟
+            </el-descriptions-item>
+            <el-descriptions-item label="及格分">
+              {{ examPreview.management.exam.passingScore }}
+            </el-descriptions-item>
+            <el-descriptions-item label="题目数量">
+              {{ examPreview.management.paper.questionCount }}
+            </el-descriptions-item>
+            <el-descriptions-item label="试卷总分">
+              {{ examPreview.management.paper.totalScore }}
+            </el-descriptions-item>
+          </el-descriptions>
+          <h3>指定考生（{{ examPreview.management.candidates.length }}）</h3>
+          <el-table :data="examPreview.management.candidates" max-height="320">
+            <el-table-column prop="username" label="用户名" min-width="150" />
+            <el-table-column prop="nickname" label="昵称" min-width="130" />
+            <el-table-column prop="status" label="状态" width="110" />
+          </el-table>
+        </template>
+      </div>
+    </el-drawer>
+
     <el-drawer v-model="orderPreviewVisible" title="模拟订单详情" size="620px">
       <div v-loading="orderPreviewLoading" class="preview-content">
         <template v-if="orderPreview">
@@ -502,6 +1013,24 @@ onMounted(() => Promise.all([loadReviews(), loadCategories(), loadOrders()]))
       </div>
     </el-drawer>
 
+    <el-dialog v-model="roleDialogVisible" title="分配用户角色" width="480px">
+      <template v-if="editingUser">
+        <p class="dialog-description">
+          正在修改 <strong>{{ editingUser.username }}</strong> 的角色。角色变更会在其下一次
+          API 请求时立即生效。
+        </p>
+        <el-checkbox-group v-model="selectedRoles" class="role-options">
+          <el-checkbox value="USER">普通用户</el-checkbox>
+          <el-checkbox value="PUBLISHER">发布者</el-checkbox>
+          <el-checkbox value="ADMIN">管理员</el-checkbox>
+        </el-checkbox-group>
+      </template>
+      <template #footer>
+        <el-button @click="roleDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="roleSaving" @click="saveRoles">保存角色</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog
       v-model="categoryVisible"
       :title="editingCategoryId ? '编辑分类' : '新建分类'"
@@ -538,8 +1067,15 @@ onMounted(() => Promise.all([loadReviews(), loadCategories(), loadOrders()]))
 .admin-page { min-height: calc(100vh - 145px); padding: 48px 0 76px; background: #f6f8fc; }
 .workspace-card { border: 1px solid var(--lp-border); border-radius: 18px; background: #fff; box-shadow: var(--lp-shadow); padding: 10px 24px 24px; }
 .toolbar { display: grid; max-width: 760px; align-items: center; gap: 12px; margin: 8px 0 20px; grid-template-columns: minmax(220px, 1fr) 180px auto; }
+.user-toolbar, .exam-toolbar { display: grid; align-items: center; gap: 12px; margin: 8px 0 20px; grid-template-columns: minmax(240px, 1fr) 170px 170px auto; }
 .order-toolbar { display: grid; align-items: center; gap: 12px; margin: 18px 0 20px; grid-template-columns: minmax(220px, 1fr) 150px 180px auto; }
+.audit-toolbar { display: grid; align-items: center; gap: 12px; margin: 8px 0 16px; grid-template-columns: 150px minmax(150px, 1fr) 140px minmax(220px, 1fr) auto; }
+.audit-toolbar + .el-alert { margin-bottom: 18px; }
 .el-pagination { justify-content: flex-end; margin-top: 22px; }
+.table-subtitle { margin-top: 4px; color: var(--lp-text-secondary); font-size: 12px; }
+.role-tag { margin: 2px 6px 2px 0; }
+.dialog-description { color: var(--lp-text-secondary); line-height: 1.7; }
+.role-options { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
 .category-actions { display: flex; align-items: center; justify-content: space-between; margin: 8px 0 20px; }
 .category-actions p { margin: 0; color: var(--lp-text-secondary); font-size: 13px; }
 .preview-content { min-height: 260px; }
@@ -555,7 +1091,9 @@ onMounted(() => Promise.all([loadReviews(), loadCategories(), loadOrders()]))
 @media (max-width: 640px) {
   .workspace-card { padding: 8px 12px 18px; }
   .toolbar { grid-template-columns: 1fr; }
+  .user-toolbar, .exam-toolbar { grid-template-columns: 1fr; }
   .order-toolbar { grid-template-columns: 1fr; }
+  .audit-toolbar { grid-template-columns: 1fr; }
   .category-actions { align-items: stretch; flex-direction: column; gap: 12px; }
 }
 </style>

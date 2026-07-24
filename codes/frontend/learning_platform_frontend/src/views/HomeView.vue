@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ArrowRight, Document, MagicStick, Monitor } from '@element-plus/icons-vue'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 
 import { listContents } from '@/api/content'
 import { getHealthStatus } from '@/api/health'
@@ -12,8 +13,10 @@ type BackendState = 'checking' | 'online' | 'offline'
 const HEALTH_POLL_INTERVAL_MS = 10_000
 const backendState = ref<BackendState>('checking')
 const authStore = useAuthStore()
+const route = useRoute()
 const featuredLoading = ref(false)
 const featuredContents = ref<ContentSummary[]>([])
+const featuredError = ref('')
 
 let healthPollTimer: ReturnType<typeof setInterval> | undefined
 let healthCheckRunning = false
@@ -35,9 +38,13 @@ async function checkBackend(showChecking = true): Promise<void> {
 async function loadFeatured(): Promise<void> {
   if (!authStore.isAuthenticated) return
   featuredLoading.value = true
+  featuredError.value = ''
   try {
     const result = await listContents({ pageNumber: 1, pageSize: 3 })
     featuredContents.value = result.items
+  } catch (error) {
+    featuredContents.value = []
+    featuredError.value = error instanceof Error ? error.message : '精选资料加载失败'
   } finally {
     featuredLoading.value = false
   }
@@ -55,6 +62,15 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <div v-if="route.query.forbidden === '1'" class="page-container access-alert">
+    <el-alert
+      title="你没有访问该页面的权限"
+      description="系统已阻止本次越权访问。如需使用该功能，请联系管理员分配对应角色。"
+      type="warning"
+      show-icon
+      closable
+    />
+  </div>
   <section class="hero-section">
     <div class="hero-decoration hero-decoration-one" />
     <div class="hero-decoration hero-decoration-two" />
@@ -97,8 +113,22 @@ onBeforeUnmount(() => {
         </RouterLink>
       </div>
       <div v-if="authStore.isAuthenticated" v-loading="featuredLoading" class="featured-grid">
+        <el-alert
+          v-if="featuredError && !featuredLoading"
+          :title="featuredError"
+          type="error"
+          show-icon
+          :closable="false"
+        >
+          <template #default>
+            <el-button link type="primary" @click="loadFeatured">重新加载</el-button>
+          </template>
+        </el-alert>
         <ContentCard v-for="item in featuredContents" :key="item.id" :content="item" />
-        <el-empty v-if="!featuredLoading && featuredContents.length === 0" description="暂无已发布资料" />
+        <el-empty
+          v-if="!featuredLoading && !featuredError && featuredContents.length === 0"
+          description="暂无已发布资料"
+        />
       </div>
       <div v-else class="guest-featured">
         <div>
@@ -118,6 +148,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.access-alert { padding-top: 18px; }
 .hero-section { position: relative; overflow: hidden; padding: 78px 0 88px; background: linear-gradient(145deg, #f8fbff 0%, #f4f7ff 54%, #f8f9fc 100%); }
 .hero-content { position: relative; z-index: 1; display: grid; align-items: center; gap: 70px; grid-template-columns: minmax(0, 1fr) minmax(420px, 0.88fr); }
 .eyebrow { display: inline-flex; border: 1px solid #bfdbfe; border-radius: 999px; margin-bottom: 22px; color: var(--lp-primary); background: #eff6ff; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; padding: 8px 13px; }
@@ -152,6 +183,7 @@ onBeforeUnmount(() => {
 .featured-heading h2 { margin: 9px 0 0; font-size: 30px; }
 .featured-grid { display: grid; min-height: 180px; gap: 20px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .featured-grid .el-empty { grid-column: 1 / -1; }
+.featured-grid > .el-alert { grid-column: 1 / -1; }
 .guest-featured { display: flex; border: 1px solid #dbe7fb; border-radius: 18px; align-items: center; justify-content: space-between; gap: 24px; background: linear-gradient(135deg, #fff, #eef5ff); padding: 28px 32px; }
 .guest-featured strong { font-size: 18px; }
 .guest-featured p { margin: 8px 0 0; color: var(--lp-text-secondary); }

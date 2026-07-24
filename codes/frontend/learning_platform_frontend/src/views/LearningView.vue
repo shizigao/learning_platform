@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Download } from '@element-plus/icons-vue'
+import { Download, MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -80,6 +80,9 @@ onMounted(load)
           <el-slider v-model="percent" :step="5" show-input />
           <el-input v-model="lastPosition" maxlength="255" placeholder="例如：第 6 页、12:30 或第三章" />
           <el-button type="primary" :loading="saving" @click="saveProgress">保存学习进度</el-button>
+          <RouterLink :to="{ path: '/ai-assistant', query: { contentId } }">
+            <el-button :icon="MagicStick">打开 AI 学习助手</el-button>
+          </RouterLink>
           <small v-if="progress">最后学习：{{ new Date(progress.lastLearnedAt).toLocaleString() }}</small>
         </aside>
       </div>
@@ -93,7 +96,7 @@ onMounted(load)
 .progress-summary { display: flex; align-items: flex-end; flex-direction: column; }.progress-summary strong { color: var(--lp-primary); font-size: 34px; }.progress-summary span { color: #98a2b3; font-size: 12px; }
 .learning-layout { display: grid; align-items: start; gap: 22px; grid-template-columns: minmax(0, 1fr) 310px; }.reader-card, .progress-card { border: 1px solid var(--lp-border); border-radius: 18px; background: #fff; box-shadow: var(--lp-shadow); }
 .reader-card { min-height: 560px; padding: 38px; }.article-body { font-size: 16px; line-height: 2; white-space: pre-wrap; }
-.progress-card { position: sticky; top: 94px; padding: 24px; }.progress-card h2 { margin-top: 0; }.progress-card p { color: var(--lp-text-secondary); font-size: 13px; line-height: 1.7; }.progress-card .el-input, .progress-card .el-button { width: 100%; margin-top: 18px; }.progress-card small { display: block; margin-top: 18px; color: #98a2b3; }
+.progress-card { position: sticky; top: 94px; padding: 24px; }.progress-card h2 { margin-top: 0; }.progress-card p { color: var(--lp-text-secondary); font-size: 13px; line-height: 1.7; }.progress-card .el-input, .progress-card .el-button { width: 100%; margin-top: 18px; }.progress-card a { display: block; }.progress-card small { display: block; margin-top: 18px; color: #98a2b3; }
 .file-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--lp-border); padding: 16px 0; }.file-item small { display: block; margin-top: 6px; color: #98a2b3; }
 @media (max-width: 820px) { .learning-layout { grid-template-columns: 1fr; } .progress-card { position: static; } }
 </style>

@@ -10,6 +10,7 @@ public enum ErrorCode {
     FORBIDDEN(40300, "无权执行此操作", HttpStatus.FORBIDDEN),
     NOT_FOUND(40400, "请求的资源不存在", HttpStatus.NOT_FOUND),
     CONFLICT(40900, "当前状态下无法执行此操作", HttpStatus.CONFLICT),
+    PAYLOAD_TOO_LARGE(41300, "上传文件大小超出限制", HttpStatus.PAYLOAD_TOO_LARGE),
     TOO_MANY_REQUESTS(42900, "请求过于频繁，请稍后重试", HttpStatus.TOO_MANY_REQUESTS),
     INTERNAL_ERROR(50000, "系统繁忙，请稍后重试", HttpStatus.INTERNAL_SERVER_ERROR);
 

@@ -329,6 +329,31 @@ class OrderControllerIntegrationTests {
                                 """.formatted(contentProductId)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("付费资料商品的购买数量只能为1"));
+
+        long duplicateContentProductId = createProduct(
+                "CONTENT_DATABASE_ALTERNATIVE",
+                ProductType.CONTENT,
+                100L,
+                null,
+                "19.90"
+        ).id();
+        mockMvc.perform(post("/api/orders")
+                        .header(AUTHORIZATION, bearer(buyerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "items": [
+                                    {"productId": %d, "quantity": 1},
+                                    {"productId": %d, "quantity": 1}
+                                  ]
+                                }
+                                """.formatted(
+                                        contentProductId,
+                                        duplicateContentProductId
+                                )))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("同一付费资料不能在订单中重复购买"));
     }
 
     @Test
@@ -432,6 +457,136 @@ class OrderControllerIntegrationTests {
     }
 
     @Test
+    void preventsDuplicateContentOrdersBeforeAndAfterPayment() throws Exception {
+        long pendingOrderId = createSingleItemOrder(contentProductId);
+
+        mockMvc.perform(post("/api/orders")
+                        .header(AUTHORIZATION, bearer(buyerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"items":[{"productId":%d,"quantity":1}]}
+                                """.formatted(contentProductId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("该付费资料已购买或存在待支付订单，请勿重复购买"));
+
+        mockMvc.perform(post("/api/orders/{id}/cancel", pendingOrderId)
+                        .header(AUTHORIZATION, bearer(buyerToken)))
+                .andExpect(status().isOk());
+
+        long paidOrderId = createSingleItemOrder(contentProductId);
+        mockMvc.perform(post("/api/orders/{id}/mock-pay", paidOrderId)
+                        .header(AUTHORIZATION, bearer(buyerToken)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/orders")
+                        .header(AUTHORIZATION, bearer(buyerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"items":[{"productId":%d,"quantity":1}]}
+                                """.formatted(contentProductId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("你已拥有该付费资料，无需重复购买"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM orders o
+                INNER JOIN order_item oi ON oi.order_id = o.id
+                WHERE o.user_id = ?
+                  AND o.status = 'PAID'
+                  AND oi.product_type_snapshot = 'CONTENT'
+                  AND oi.resource_id_snapshot = 100
+                """,
+                Integer.class,
+                buyer.getId()
+        )).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM user_entitlement
+                WHERE user_id = ?
+                  AND entitlement_type = 'CONTENT_ACCESS'
+                  AND resource_id = 100
+                  AND status = 'ACTIVE'
+                """,
+                Integer.class,
+                buyer.getId()
+        )).isEqualTo(1);
+    }
+
+    @Test
+    void preventsConcurrentContentOrderCreation() throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<Integer>> results = List.of(
+                    executor.submit(() -> createOrderAfterStart(start, contentProductId)),
+                    executor.submit(() -> createOrderAfterStart(start, contentProductId))
+            );
+            start.countDown();
+
+            List<Integer> statuses = results.stream()
+                    .map(result -> {
+                        try {
+                            return result.get(5, TimeUnit.SECONDS);
+                        } catch (Exception exception) {
+                            throw new AssertionError(exception);
+                        }
+                    })
+                    .toList();
+            assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM orders o
+                INNER JOIN order_item oi ON oi.order_id = o.id
+                WHERE o.user_id = ?
+                  AND o.status = 'PENDING_PAYMENT'
+                  AND oi.product_type_snapshot = 'CONTENT'
+                  AND oi.resource_id_snapshot = 100
+                """,
+                Integer.class,
+                buyer.getId()
+        )).isEqualTo(1);
+    }
+
+    @Test
+    void preventsPayingLegacyPendingContentOrderAfterAccessWasGranted() throws Exception {
+        long orderId = createSingleItemOrder(contentProductId);
+        UserEntitlement entitlement = new UserEntitlement();
+        entitlement.setUserId(buyer.getId());
+        entitlement.setEntitlementType(EntitlementType.CONTENT_ACCESS);
+        entitlement.setResourceId(100L);
+        entitlement.setStatus(EntitlementStatus.ACTIVE);
+        entitlement.setEffectiveAt(LocalDateTime.now().minusMinutes(1));
+        entitlement.setVersion(0);
+        entitlementService.create(entitlement);
+
+        mockMvc.perform(post("/api/orders/{id}/mock-pay", orderId)
+                        .header(AUTHORIZATION, bearer(buyerToken)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("你已拥有该付费资料，无需重复购买"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT status FROM orders WHERE id = ?",
+                String.class,
+                orderId
+        )).isEqualTo("PENDING_PAYMENT");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM payment_record WHERE order_id = ?",
+                Integer.class,
+                orderId
+        )).isZero();
+    }
+
+    @Test
     void adminCanSearchAllOrdersWhileRegularUserIsForbidden() throws Exception {
         long orderId = createSingleItemOrder(aiProductId);
 
@@ -465,6 +620,22 @@ class OrderControllerIntegrationTests {
         } catch (BusinessException exception) {
             return exception.getErrorCode();
         }
+    }
+
+    private int createOrderAfterStart(
+            CountDownLatch start,
+            long productId
+    ) throws Exception {
+        start.await();
+        return mockMvc.perform(post("/api/orders")
+                        .header(AUTHORIZATION, bearer(buyerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"items":[{"productId":%d,"quantity":1}]}
+                                """.formatted(productId)))
+                .andReturn()
+                .getResponse()
+                .getStatus();
     }
 
     private UserEntitlement quotaEntitlement(

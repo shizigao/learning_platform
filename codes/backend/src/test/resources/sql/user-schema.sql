@@ -1,3 +1,8 @@
+DROP TABLE IF EXISTS ai_message;
+DROP TABLE IF EXISTS ai_usage_record;
+DROP TABLE IF EXISTS ai_summary;
+DROP TABLE IF EXISTS ai_conversation;
+DROP TABLE IF EXISTS ai_task;
 DROP TABLE IF EXISTS exam_result;
 DROP TABLE IF EXISTS exam_answer;
 DROP TABLE IF EXISTS exam_attempt;
@@ -20,6 +25,7 @@ DROP TABLE IF EXISTS learning_progress;
 DROP TABLE IF EXISTS content_file;
 DROP TABLE IF EXISTS learning_content;
 DROP TABLE IF EXISTS content_category;
+DROP TABLE IF EXISTS operation_log;
 DROP TABLE IF EXISTS user_role;
 DROP TABLE IF EXISTS role;
 DROP TABLE IF EXISTS `user`;
@@ -60,6 +66,28 @@ CREATE TABLE user_role (
     PRIMARY KEY (user_id, role_id),
     CONSTRAINT fk_test_user_role_user FOREIGN KEY (user_id) REFERENCES `user` (id),
     CONSTRAINT fk_test_user_role_role FOREIGN KEY (role_id) REFERENCES role (id)
+);
+
+CREATE TABLE operation_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    operator_id BIGINT,
+    operator_name VARCHAR(64),
+    module VARCHAR(64) NOT NULL,
+    action VARCHAR(64) NOT NULL,
+    target_type VARCHAR(64),
+    target_id VARCHAR(64),
+    request_method VARCHAR(16),
+    request_path VARCHAR(512),
+    request_id VARCHAR(64),
+    ip_address VARCHAR(64),
+    user_agent VARCHAR(1000),
+    result VARCHAR(32) NOT NULL,
+    detail_json VARCHAR(2000),
+    error_message VARCHAR(1000),
+    duration_ms INT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_test_operation_operator
+        FOREIGN KEY (operator_id) REFERENCES `user` (id)
 );
 
 INSERT INTO role (code, name, description, enabled)

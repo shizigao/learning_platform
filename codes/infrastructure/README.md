@@ -62,3 +62,22 @@ docker compose --env-file infrastructure/.env -f infrastructure/docker-compose.l
 
 不要执行带 `-v` 的 `down` 命令，否则会删除 Redis 和 MinIO 的本地数据卷。
 
+## 6. 操作日志保留任务
+
+MVP 统一将 `operation_log` 保留 180 天。部署后应通过数据库事件、运维平台或受控
+计划任务每周执行一次以下清理，并记录执行时间、影响行数和执行人：
+
+```sql
+DELETE FROM operation_log
+WHERE created_at < CURRENT_TIMESTAMP(3) - INTERVAL 180 DAY;
+```
+
+首次启用和每次调整前先完成数据库备份。涉及安全事件、投诉或争议的记录应暂停清理
+并受控延期保留，事件关闭后恢复正常周期。完整的数据、内容和隐私规则见
+`../backend/docs/mvp-governance-policy.md`。
+
+## 7. 生产部署模板
+
+`production/` 提供后端生产环境变量、systemd 服务和 Nginx 双域名反向代理示例。
+这些文件中的域名和凭证均为占位符，不能直接用于公网。完整安装、证书、备份、更新
+与回滚步骤见项目根目录 `项目部署.md`。

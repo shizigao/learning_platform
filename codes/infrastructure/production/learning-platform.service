@@ -1,0 +1,27 @@
+[Unit]
+Description=Learning Platform Spring Boot Backend
+After=network-online.target mysql.service docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=learning-platform
+Group=learning-platform
+WorkingDirectory=/opt/learning-platform/current
+EnvironmentFile=/etc/learning-platform/backend.env
+ExecStart=/usr/bin/java -XX:MaxRAMPercentage=75 -Dfile.encoding=UTF-8 -jar /opt/learning-platform/current/app.jar --server.address=127.0.0.1
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=90
+TimeoutStopSec=45
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/learning-platform
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target
+

@@ -12,4 +12,8 @@ public record LoginRequest(
         @Size(max = 64, message = "密码不能超过64个字符")
         String password
 ) {
+    @Override
+    public String toString() {
+        return "LoginRequest[username=" + username + ", password=[REDACTED]]";
+    }
 }

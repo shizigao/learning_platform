@@ -23,6 +23,11 @@ app:
       max-account-failures: 5
       max-ip-failures: 20
       window: 15m
+    rate-limit:
+      enabled: false
+      general-requests-per-minute: 600
+      auth-requests-per-minute: 30
+      upload-requests-per-minute: 30
   storage:
     minio:
       endpoint: http://localhost:9000
@@ -35,9 +40,22 @@ app:
     signed-url-ttl: 10m
   ai:
     provider: mock
+    limits:
+      max-input-chars: 100000
+      max-context-messages: 10
+      max-context-chars: 20000
+      requests-per-window: 1000
+      rate-window: 1m
+      max-concurrent-per-user: 1
+      timeout: 5s
+    mock:
+      model: mock-learning-assistant-test
+      scenario: success
+      delay: 0ms
     deepseek:
       base-url: https://api.deepseek.com
       api-key: ""
       model: deepseek-v4-flash
       timeout: 5s
+      thinking-enabled: false
 

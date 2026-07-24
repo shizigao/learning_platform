@@ -79,8 +79,12 @@ const router = createRouter({
         {
           path: 'ai-assistant',
           name: 'ai-assistant',
-          component: () => import('@/views/PortalPlaceholderView.vue'),
-          meta: { title: 'AI 学习助手', description: 'AI 总结与知识讲解将在后续阶段开放。' },
+          component: () => import('@/views/AiAssistantView.vue'),
+          meta: {
+            title: 'AI 学习助手',
+            requiresAuth: true,
+            roles: ['USER', 'PUBLISHER', 'ADMIN'],
+          },
         },
         {
           path: 'my-learning',
@@ -190,6 +194,16 @@ const router = createRouter({
             roles: ['ADMIN'],
           },
         },
+        {
+          path: 'admin/ai',
+          name: 'admin-ai',
+          component: () => import('@/views/AdminAiConfigView.vue'),
+          meta: {
+            title: 'AI 运行配置',
+            requiresAuth: true,
+            roles: ['ADMIN'],
+          },
+        },
       ],
     },
     {
@@ -209,6 +223,12 @@ const router = createRouter({
           meta: { title: '注册', guestOnly: true },
         },
       ],
+    },
+    {
+      path: '/error',
+      name: 'error',
+      component: () => import('@/views/ErrorView.vue'),
+      meta: { title: '页面加载异常' },
     },
     {
       path: '/:pathMatch(.*)*',
@@ -240,6 +260,15 @@ router.afterEach((to) => {
   const pageTitle = typeof to.meta.title === 'string' ? to.meta.title : ''
   const appTitle = import.meta.env.VITE_APP_TITLE || '智能在线学习考试平台'
   document.title = pageTitle ? `${pageTitle} - ${appTitle}` : appTitle
+})
+
+router.onError((error, to) => {
+  if (to.name === 'error') return
+  void router.replace({
+    name: 'error',
+    query: { message: '页面资源加载失败，请检查网络后重试。' },
+  })
+  console.error('Route loading failed', error)
 })
 
 export default router

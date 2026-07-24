@@ -1,6 +1,7 @@
 package com.learningplatform.user.mapper;
 
 import com.learningplatform.user.domain.User;
+import com.learningplatform.user.domain.RoleCode;
 import com.learningplatform.user.domain.UserStatus;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
@@ -23,6 +24,9 @@ public interface UserMapper {
     @Select("SELECT " + USER_COLUMNS + " FROM `user` WHERE id = #{id} AND deleted = 0")
     Optional<User> findById(Long id);
 
+    @Select("SELECT id FROM `user` WHERE id = #{id} AND deleted = 0 FOR UPDATE")
+    Optional<Long> lockById(Long id);
+
     @Select("SELECT " + USER_COLUMNS + " FROM `user` WHERE username = #{username} AND deleted = 0")
     Optional<User> findByUsername(String username);
 
@@ -41,6 +45,69 @@ public interface UserMapper {
             LIMIT 50
             """)
     List<User> searchActive(String keyword);
+
+    @Select("""
+            <script>
+            SELECT COUNT(*)
+            FROM `user` u
+            WHERE u.deleted = 0
+            <if test='status != null'>AND u.status = #{status}</if>
+            <if test='keyword != null'>
+              AND (u.username LIKE CONCAT('%', #{keyword}, '%')
+                   OR u.nickname LIKE CONCAT('%', #{keyword}, '%')
+                   OR u.email LIKE CONCAT('%', #{keyword}, '%')
+                   OR u.phone LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test='role != null'>
+              AND EXISTS (
+                SELECT 1
+                FROM user_role ur
+                INNER JOIN role r ON r.id = ur.role_id
+                WHERE ur.user_id = u.id AND r.code = #{role} AND r.enabled = 1
+              )
+            </if>
+            </script>
+            """)
+    long countForAdmin(
+            @Param("status") UserStatus status,
+            @Param("role") RoleCode role,
+            @Param("keyword") String keyword
+    );
+
+    @Select("""
+            <script>
+            SELECT
+              u.id, u.username, u.password_hash, u.nickname, u.avatar_url,
+              u.email, u.phone, u.gender, u.bio, u.status, u.last_login_at,
+              u.last_login_ip, u.created_at, u.updated_at, u.deleted
+            FROM `user` u
+            WHERE u.deleted = 0
+            <if test='status != null'>AND u.status = #{status}</if>
+            <if test='keyword != null'>
+              AND (u.username LIKE CONCAT('%', #{keyword}, '%')
+                   OR u.nickname LIKE CONCAT('%', #{keyword}, '%')
+                   OR u.email LIKE CONCAT('%', #{keyword}, '%')
+                   OR u.phone LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+            <if test='role != null'>
+              AND EXISTS (
+                SELECT 1
+                FROM user_role ur
+                INNER JOIN role r ON r.id = ur.role_id
+                WHERE ur.user_id = u.id AND r.code = #{role} AND r.enabled = 1
+              )
+            </if>
+            ORDER BY u.created_at DESC, u.id DESC
+            LIMIT #{limit} OFFSET #{offset}
+            </script>
+            """)
+    List<User> findForAdmin(
+            @Param("status") UserStatus status,
+            @Param("role") RoleCode role,
+            @Param("keyword") String keyword,
+            @Param("offset") long offset,
+            @Param("limit") int limit
+    );
 
     @Select("""
             SELECT COUNT(*) > 0

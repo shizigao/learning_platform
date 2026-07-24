@@ -6,6 +6,7 @@ import com.learningplatform.auth.dto.RegisterRequest;
 import com.learningplatform.auth.dto.UpdateProfileRequest;
 import com.learningplatform.auth.dto.UserProfileResponse;
 import com.learningplatform.auth.service.AuthService;
+import com.learningplatform.admin.audit.OperationAuditFilter;
 import com.learningplatform.common.api.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -36,7 +37,17 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest
     ) {
-        return ApiResponse.success(authService.login(request, httpRequest.getRemoteAddr()));
+        httpRequest.setAttribute(
+                OperationAuditFilter.LOGIN_OPERATOR_NAME,
+                request.username().trim().toLowerCase(java.util.Locale.ROOT)
+        );
+        LoginResponse response =
+                authService.login(request, httpRequest.getRemoteAddr());
+        httpRequest.setAttribute(
+                OperationAuditFilter.LOGIN_OPERATOR_ID,
+                response.user().id()
+        );
+        return ApiResponse.success(response);
     }
 
     @PostMapping("/logout")

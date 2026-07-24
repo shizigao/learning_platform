@@ -18,6 +18,7 @@ import com.learningplatform.order.dto.PaymentRecordResponse;
 import com.learningplatform.order.mapper.OrderItemMapper;
 import com.learningplatform.order.mapper.OrderMapper;
 import com.learningplatform.order.mapper.PaymentRecordMapper;
+import com.learningplatform.user.mapper.UserMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,25 +41,32 @@ public class OrderService {
     private final PaymentRecordMapper paymentMapper;
     private final ProductService productService;
     private final BusinessNumberGenerator numberGenerator;
+    private final EntitlementService entitlementService;
+    private final UserMapper userMapper;
 
     public OrderService(
             OrderMapper orderMapper,
             OrderItemMapper itemMapper,
             PaymentRecordMapper paymentMapper,
             ProductService productService,
-            BusinessNumberGenerator numberGenerator
+            BusinessNumberGenerator numberGenerator,
+            EntitlementService entitlementService,
+            UserMapper userMapper
     ) {
         this.orderMapper = orderMapper;
         this.itemMapper = itemMapper;
         this.paymentMapper = paymentMapper;
         this.productService = productService;
         this.numberGenerator = numberGenerator;
+        this.entitlementService = entitlementService;
+        this.userMapper = userMapper;
     }
 
     @Transactional
     public OrderResponse create(Long userId, OrderCreateRequest request) {
         LocalDateTime now = now();
         List<OrderItem> items = buildItems(request.items());
+        lockAndValidateContentPurchase(userId, items, null);
         BigDecimal total = items.stream()
                 .map(OrderItem::getSubtotalAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
@@ -155,6 +163,14 @@ public class OrderService {
         return order;
     }
 
+    void assertContentPaymentAllowed(Long orderId, Long userId) {
+        lockAndValidateContentPurchase(
+                userId,
+                itemMapper.findByOrderId(orderId),
+                orderId
+        );
+    }
+
     OrderResponse response(Order order) {
         return response(order, itemMapper.findByOrderId(order.getId()));
     }
@@ -184,6 +200,7 @@ public class OrderService {
 
     private List<OrderItem> buildItems(List<OrderCreateItemRequest> requests) {
         Set<Long> productIds = new HashSet<>();
+        Set<Long> contentResourceIds = new HashSet<>();
         List<OrderItem> items = new ArrayList<>(requests.size());
         for (OrderCreateItemRequest request : requests) {
             if (!productIds.add(request.productId())) {
@@ -194,6 +211,13 @@ public class OrderService {
                 throw new BusinessException(
                         ErrorCode.BAD_REQUEST,
                         "付费资料商品的购买数量只能为1"
+                );
+            }
+            if (product.getProductType() == ProductType.CONTENT
+                    && !contentResourceIds.add(product.getResourceId())) {
+                throw new BusinessException(
+                        ErrorCode.BAD_REQUEST,
+                        "同一付费资料不能在订单中重复购买"
                 );
             }
             BigDecimal subtotal = product.getPrice()
@@ -212,6 +236,42 @@ public class OrderService {
             items.add(item);
         }
         return List.copyOf(items);
+    }
+
+    private void lockAndValidateContentPurchase(
+            Long userId,
+            List<OrderItem> items,
+            Long excludedOrderId
+    ) {
+        List<Long> resourceIds = items.stream()
+                .filter(item -> item.getProductTypeSnapshot() == ProductType.CONTENT)
+                .map(OrderItem::getResourceIdSnapshot)
+                .distinct()
+                .toList();
+        if (resourceIds.isEmpty()) {
+            return;
+        }
+        userMapper.lockById(userId).orElseThrow(() ->
+                new BusinessException(ErrorCode.NOT_FOUND, "用户不存在")
+        );
+        for (Long resourceId : resourceIds) {
+            if (entitlementService.hasActiveContentAccess(userId, resourceId)) {
+                throw new BusinessException(
+                        ErrorCode.CONFLICT,
+                        "你已拥有该付费资料，无需重复购买"
+                );
+            }
+            if (orderMapper.existsBlockingContentOrder(
+                    userId,
+                    resourceId,
+                    excludedOrderId
+            )) {
+                throw new BusinessException(
+                        ErrorCode.CONFLICT,
+                        "该付费资料已购买或存在待支付订单，请勿重复购买"
+                );
+            }
+        }
     }
 
     private String normalize(String value) {

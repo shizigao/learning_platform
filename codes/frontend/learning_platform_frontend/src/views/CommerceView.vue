@@ -56,6 +56,19 @@ const visibleProducts = computed(() =>
     ? products.value.filter((product) => product.productType === productType.value)
     : products.value,
 )
+const ownedContentResourceIds = computed(
+  () =>
+    new Set(
+      entitlements.value
+        .filter(
+          (item) =>
+            item.entitlementType === 'CONTENT_ACCESS' &&
+            item.status === 'ACTIVE' &&
+            item.resourceId != null,
+        )
+        .map((item) => item.resourceId as number),
+    ),
+)
 
 const productTypeLabels: Record<ProductType, string> = {
   CONTENT: '付费资料',
@@ -100,6 +113,14 @@ function purchaseQuantity(product: Product): number {
   return product.productType === 'CONTENT' ? 1 : (quantities[product.id] ?? 1)
 }
 
+function ownsContent(product: Product): boolean {
+  return (
+    product.productType === 'CONTENT' &&
+    product.resourceId != null &&
+    ownedContentResourceIds.value.has(product.resourceId)
+  )
+}
+
 async function loadProducts(): Promise<void> {
   productsLoading.value = true
   try {
@@ -140,6 +161,10 @@ async function loadEntitlements(): Promise<void> {
 }
 
 async function buy(product: Product): Promise<void> {
+  if (ownsContent(product)) {
+    ElMessage.warning('你已拥有该付费资料，无需重复购买')
+    return
+  }
   const quantity = purchaseQuantity(product)
   const total = Number(product.price) * quantity
   try {
@@ -265,12 +290,16 @@ onMounted(() => Promise.all([loadProducts(), loadOrders(), loadEntitlements()]))
                 </div>
                 <el-button
                   type="primary"
+                  :disabled="ownsContent(product)"
                   :loading="creatingId === product.id"
                   @click="buy(product)"
                 >
-                  创建测试订单
+                  {{ ownsContent(product) ? '已拥有该资料' : '创建测试订单' }}
                 </el-button>
-                <small>后续仅进行模拟支付，不会真实扣款</small>
+                <small v-if="ownsContent(product)" class="owned-note">
+                  该资料已在“我的权益”中，无需再次购买
+                </small>
+                <small v-else>后续仅进行模拟支付，不会真实扣款</small>
               </article>
               <el-empty v-if="!productsLoading && visibleProducts.length === 0" description="暂无在售商品" />
             </div>
@@ -405,6 +434,7 @@ onMounted(() => Promise.all([loadProducts(), loadOrders(), loadEntitlements()]))
 .product-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 22px 0 14px; }
 .product-footer strong { color: var(--lp-primary); font-size: 25px; }
 .product-card small { margin-top: 9px; color: #b54708; text-align: center; }
+.product-card .owned-note { color: #039855; }
 .order-list { display: grid; min-height: 200px; gap: 14px; }
 .order-card { border: 1px solid var(--lp-border); border-radius: 15px; overflow: hidden; }
 .order-card header, .order-card footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #f8faff; padding: 15px 18px; }

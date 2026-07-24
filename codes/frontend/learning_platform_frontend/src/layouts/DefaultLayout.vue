@@ -91,12 +91,14 @@ async function handleUserCommand(command: string): Promise<void> {
 <style scoped>
 .app-shell { display: flex; min-height: 100vh; flex-direction: column; }
 .app-header { position: sticky; z-index: 20; top: 0; border-bottom: 1px solid rgb(228 231 236 / 85%); background: rgb(255 255 255 / 92%); backdrop-filter: blur(16px); }
-.header-inner { display: flex; height: 72px; align-items: center; gap: 36px; }
-.desktop-nav { display: flex; flex: 1; align-items: center; gap: 8px; }
-.nav-link { border-radius: 9px; color: var(--lp-text-secondary); font-size: 15px; font-weight: 600; padding: 9px 13px; transition: 160ms ease; }
+.header-inner { display: flex; width: min(1680px, calc(100% - 40px)); height: 72px; align-items: center; gap: 28px; }
+.header-inner > a:first-child { flex: 0 0 auto; }
+.desktop-nav { display: flex; overflow-x: auto; min-width: 0; flex: 1; align-items: center; gap: 4px; scrollbar-width: none; }
+.desktop-nav::-webkit-scrollbar { display: none; }
+.nav-link { flex: 0 0 auto; border-radius: 9px; color: var(--lp-text-secondary); font-size: 15px; font-weight: 600; padding: 9px 12px; white-space: nowrap; transition: 160ms ease; }
 .nav-link:hover, .nav-link.router-link-exact-active { color: var(--lp-primary); background: #eff6ff; }
-.header-actions { display: flex; align-items: center; }
-.user-trigger { display: flex; border: 0; align-items: center; gap: 9px; color: var(--lp-text); background: transparent; cursor: pointer; font-weight: 600; padding: 4px; }
+.header-actions { display: flex; flex: 0 0 auto; align-items: center; white-space: nowrap; }
+.user-trigger { display: flex; border: 0; align-items: center; gap: 9px; color: var(--lp-text); background: transparent; cursor: pointer; font-weight: 600; padding: 4px; white-space: nowrap; }
 .app-main { flex: 1; }
 .app-footer { border-top: 1px solid var(--lp-border); background: var(--lp-surface); }
 .footer-inner { display: flex; min-height: 72px; align-items: center; justify-content: space-between; color: var(--lp-text-secondary); font-size: 13px; }
