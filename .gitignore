@@ -1,2 +1,56 @@
+# Operating system files
 .DS_Store
 文档/.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDEs and editors
+.idea/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+**/.vscode/*
+!**/.vscode/extensions.json
+
+# Local environment files; examples remain tracked
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Build output and dependencies
+**/target/
+**/node_modules/
+**/dist/
+**/dist-ssr/
+*.class
+*.tsbuildinfo
+
+# Logs and local runtime data
+logs/
+**/logs/
+*.log
+*.pid
+*.tmp
+*.temp
+.local-data/
+uploads/
+
+# Credentials and certificates
+数据库密码（开发使用）.txt
+*.jks
+*.p12
+*.pfx
+*.pem
+*.key
+
+# Test and coverage output
+coverage/
+**/coverage/
+**/test-results/
+**/playwright-report/
