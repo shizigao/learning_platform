@@ -58,6 +58,8 @@ class SensitiveConfigurationRedactionTests {
                 "test-minio-secret",
                 "learning-platform"
         );
+        TeacherDataSecurityProperties teacherData =
+                new TeacherDataSecurityProperties("teacher-secret-key");
 
         assertThat(deepSeek.toString())
                 .contains("[REDACTED]")
@@ -68,5 +70,8 @@ class SensitiveConfigurationRedactionTests {
         assertThat(minio.toString())
                 .contains("[REDACTED]")
                 .doesNotContain("test-minio-access", "test-minio-secret");
+        assertThat(teacherData.toString())
+                .contains("[REDACTED]")
+                .doesNotContain("teacher-secret-key");
     }
 }

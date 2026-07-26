@@ -7,6 +7,7 @@ import com.learningplatform.common.page.PageResult;
 import com.learningplatform.content.domain.ContentFileRole;
 import com.learningplatform.content.dto.ContentDetailResponse;
 import com.learningplatform.content.dto.ContentFileResponse;
+import com.learningplatform.content.dto.ContentReferenceSearchQuery;
 import com.learningplatform.content.dto.ContentSummaryResponse;
 import com.learningplatform.content.dto.ContentWriteRequest;
 import com.learningplatform.content.dto.FileUrlResponse;
@@ -53,6 +54,13 @@ public class PublisherContentController {
     ) {
         AuthenticatedUserPrincipal principal = principal(authentication);
         return ApiResponse.success(contentService.listByPublisher(principal.userId(), query));
+    }
+
+    @GetMapping("/reference-candidates")
+    public ApiResponse<PageResult<ContentSummaryResponse>> referenceCandidates(
+            @Valid @ModelAttribute ContentReferenceSearchQuery query
+    ) {
+        return ApiResponse.success(contentService.listReferenceCandidates(query));
     }
 
     @PostMapping

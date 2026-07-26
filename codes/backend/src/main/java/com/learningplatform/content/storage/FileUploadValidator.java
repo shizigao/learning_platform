@@ -15,6 +15,7 @@ public class FileUploadValidator {
     private static final long MEBIBYTE = 1024L * 1024L;
     private static final Map<ContentFileRole, Integer> ROLE_FILE_LIMITS = Map.of(
             ContentFileRole.COVER, 1,
+            ContentFileRole.INLINE_IMAGE, 10,
             ContentFileRole.CONTENT, 10,
             ContentFileRole.VIDEO, 5,
             ContentFileRole.ATTACHMENT, 10,
@@ -22,6 +23,7 @@ public class FileUploadValidator {
     );
     private static final Map<ContentFileRole, Long> ROLE_SIZE_LIMITS = Map.of(
             ContentFileRole.COVER, 10L * MEBIBYTE,
+            ContentFileRole.INLINE_IMAGE, 10L * MEBIBYTE,
             ContentFileRole.CONTENT, 50L * MEBIBYTE,
             ContentFileRole.VIDEO, 200L * MEBIBYTE,
             ContentFileRole.ATTACHMENT, 200L * MEBIBYTE,
@@ -29,6 +31,12 @@ public class FileUploadValidator {
     );
     private static final Map<ContentFileRole, Map<String, Set<String>>> ALLOWED_TYPES = Map.of(
             ContentFileRole.COVER, Map.of(
+                    "jpg", Set.of("image/jpeg"),
+                    "jpeg", Set.of("image/jpeg"),
+                    "png", Set.of("image/png"),
+                    "webp", Set.of("image/webp")
+            ),
+            ContentFileRole.INLINE_IMAGE, Map.of(
                     "jpg", Set.of("image/jpeg"),
                     "jpeg", Set.of("image/jpeg"),
                     "png", Set.of("image/png"),

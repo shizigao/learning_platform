@@ -24,6 +24,7 @@ import {
 } from '@/api/content'
 import { getAdminOrder, listAdminOrders } from '@/api/order'
 import ContentStatusTag from '@/components/ContentStatusTag.vue'
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import SectionPageHeader from '@/components/SectionPageHeader.vue'
 import type {
   AdminExamDetail,
@@ -602,7 +603,6 @@ onMounted(() =>
 
             <el-table v-loading="reviewLoading" :data="contents">
               <el-table-column prop="title" label="资料标题" min-width="230" />
-              <el-table-column prop="contentType" label="类型" width="105" />
               <el-table-column label="价格" width="110">
                 <template #default="{ row }">
                   {{ row.isFree ? '免费' : `¥${Number(row.price).toFixed(2)}` }}
@@ -904,15 +904,20 @@ onMounted(() =>
           <h2>{{ preview.title }}</h2>
           <p class="summary">{{ preview.summary || '暂无简介' }}</p>
           <el-descriptions :column="2" border>
-            <el-descriptions-item label="资料类型">{{ preview.contentType }}</el-descriptions-item>
+            <el-descriptions-item label="资料分类">{{ preview.categoryName || `分类 ${preview.categoryId}` }}</el-descriptions-item>
             <el-descriptions-item label="收费方式">
               {{ preview.isFree ? '免费' : `¥${Number(preview.price).toFixed(2)}` }}
             </el-descriptions-item>
             <el-descriptions-item label="文件数量">{{ preview.files.length }}</el-descriptions-item>
             <el-descriptions-item label="发布者">{{ preview.publisherName || `用户 ${preview.publisherId}` }}</el-descriptions-item>
           </el-descriptions>
-          <h3>图文正文</h3>
-          <div class="article-body">{{ preview.articleBody || '该资料没有图文正文。' }}</div>
+          <h3>Markdown 正文</h3>
+          <MarkdownRenderer
+            class="article-body"
+            :source="preview.articleBody || ''"
+            :content-id="preview.id"
+            publisher-mode
+          />
           <h3>文件</h3>
           <div v-for="file in preview.files" :key="file.id" class="preview-file">
             <strong>{{ file.originalName }}</strong><span>{{ file.fileRole }}</span>

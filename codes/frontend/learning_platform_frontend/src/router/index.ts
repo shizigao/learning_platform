@@ -77,6 +77,16 @@ const router = createRouter({
           },
         },
         {
+          path: 'exams/:id/result/ai-analysis',
+          name: 'exam-personal-ai-analysis',
+          component: () => import('@/views/ExamAiAnalysisView.vue'),
+          meta: {
+            title: '考试个人 AI 分析',
+            requiresAuth: true,
+            roles: ['USER', 'PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
           path: 'ai-assistant',
           name: 'ai-assistant',
           component: () => import('@/views/AiAssistantView.vue'),
@@ -103,6 +113,42 @@ const router = createRouter({
           name: 'profile',
           component: () => import('@/views/ProfileView.vue'),
           meta: { title: '个人中心', requiresAuth: true, roles: ['USER', 'PUBLISHER', 'ADMIN'] },
+        },
+        {
+          path: 'users/:id',
+          name: 'public-user-profile',
+          component: () => import('@/views/PublicUserProfileView.vue'),
+          meta: { title: '用户个人中心', requiresAuth: true, roles: ['USER', 'PUBLISHER', 'ADMIN'] },
+        },
+        {
+          path: 'classes',
+          name: 'my-classes',
+          component: () => import('@/views/MyClassesView.vue'),
+          meta: {
+            title: '我的班级',
+            requiresAuth: true,
+            roles: ['USER', 'PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
+          path: 'offline-teaching',
+          name: 'offline-teaching',
+          component: () => import('@/views/OfflineTeachingView.vue'),
+          meta: {
+            title: '线下教学',
+            requiresAuth: true,
+            roles: ['USER', 'PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
+          path: 'class-management',
+          name: 'class-management',
+          component: () => import('@/views/ClassManagementView.vue'),
+          meta: {
+            title: '班级管理',
+            requiresAuth: true,
+            roles: ['PUBLISHER', 'ADMIN'],
+          },
         },
         {
           path: 'commerce',
@@ -159,7 +205,7 @@ const router = createRouter({
           name: 'publisher-papers',
           component: () => import('@/views/PublisherPapersView.vue'),
           meta: {
-            title: '固定试卷',
+            title: '试卷',
             requiresAuth: true,
             roles: ['PUBLISHER', 'ADMIN'],
           },
@@ -185,6 +231,16 @@ const router = createRouter({
           },
         },
         {
+          path: 'publisher/exams/:id/grading/ai-analysis',
+          name: 'publisher-exam-ai-analysis',
+          component: () => import('@/views/ExamAiAnalysisView.vue'),
+          meta: {
+            title: '考试整体 AI 分析',
+            requiresAuth: true,
+            roles: ['PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
           path: 'admin',
           name: 'admin',
           component: () => import('@/views/AdminWorkspaceView.vue'),
@@ -200,6 +256,16 @@ const router = createRouter({
           component: () => import('@/views/AdminAiConfigView.vue'),
           meta: {
             title: 'AI 运行配置',
+            requiresAuth: true,
+            roles: ['ADMIN'],
+          },
+        },
+        {
+          path: 'admin/offline-teachers',
+          name: 'admin-offline-teachers',
+          component: () => import('@/views/AdminOfflineTeachersView.vue'),
+          meta: {
+            title: '线下教师审核',
             requiresAuth: true,
             roles: ['ADMIN'],
           },

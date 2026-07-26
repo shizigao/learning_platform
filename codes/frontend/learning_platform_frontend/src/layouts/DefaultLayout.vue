@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CollectionTag, Reading, ShoppingBag, SwitchButton, User } from '@element-plus/icons-vue'
+import { CollectionTag, Location, Reading, Setting, ShoppingBag, SwitchButton, User, UserFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
@@ -15,6 +15,7 @@ const router = useRouter()
 const { navigationItems } = storeToRefs(appStore)
 const { user, isAuthenticated } = storeToRefs(authStore)
 const userInitial = computed(() => user.value?.nickname?.slice(0, 1) || '学')
+const canManageClasses = computed(() => authStore.hasRole('PUBLISHER', 'ADMIN'))
 
 async function handleUserCommand(command: string): Promise<void> {
   if (command === 'profile') {
@@ -27,6 +28,18 @@ async function handleUserCommand(command: string): Promise<void> {
   }
   if (command === 'commerce') {
     await router.push('/commerce')
+    return
+  }
+  if (command === 'classes') {
+    await router.push('/classes')
+    return
+  }
+  if (command === 'class-management') {
+    await router.push('/class-management')
+    return
+  }
+  if (command === 'offline-teaching') {
+    await router.push('/offline-teaching')
     return
   }
   if (command === 'logout') {
@@ -69,6 +82,15 @@ async function handleUserCommand(command: string): Promise<void> {
                 <el-dropdown-item command="profile" :icon="User">个人中心</el-dropdown-item>
                 <el-dropdown-item command="favorites" :icon="CollectionTag">我的收藏</el-dropdown-item>
                 <el-dropdown-item command="commerce" :icon="ShoppingBag">订单与权益</el-dropdown-item>
+                <el-dropdown-item command="classes" :icon="UserFilled">我的班级</el-dropdown-item>
+                <el-dropdown-item command="offline-teaching" :icon="Location">线下教学</el-dropdown-item>
+                <el-dropdown-item
+                  v-if="canManageClasses"
+                  command="class-management"
+                  :icon="Setting"
+                >
+                  班级管理
+                </el-dropdown-item>
                 <el-dropdown-item command="logout" :icon="SwitchButton" divided>退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>

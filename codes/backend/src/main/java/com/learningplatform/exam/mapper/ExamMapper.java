@@ -16,7 +16,7 @@ import java.util.Optional;
 @Mapper
 public interface ExamMapper {
     String COLUMNS = """
-            e.id, e.publisher_id, e.paper_id, e.name, e.instructions,
+            e.id, e.publisher_id, e.paper_id, e.name, e.instructions, e.assignment_mode,
             e.start_at, e.end_at, e.duration_minutes, e.passing_score,
             e.show_result_immediately, e.show_answer_after_finish, e.status,
             e.published_at, e.finished_at, e.version,
@@ -42,11 +42,12 @@ public interface ExamMapper {
 
     @Insert("""
             INSERT INTO exam (
-                publisher_id, paper_id, name, instructions, start_at, end_at,
+                publisher_id, paper_id, name, instructions, assignment_mode, start_at, end_at,
                 duration_minutes, passing_score, show_result_immediately,
                 show_answer_after_finish, status, version
             ) VALUES (
-                #{publisherId}, #{paperId}, #{name}, #{instructions}, #{startAt}, #{endAt},
+                #{publisherId}, #{paperId}, #{name}, #{instructions}, #{assignmentMode},
+                #{startAt}, #{endAt},
                 #{durationMinutes}, #{passingScore}, #{showResultImmediately},
                 #{showAnswerAfterFinish}, 'DRAFT', 0
             )
@@ -59,6 +60,7 @@ public interface ExamMapper {
             SET paper_id = #{paperId},
                 name = #{name},
                 instructions = #{instructions},
+                assignment_mode = #{assignmentMode},
                 start_at = #{startAt},
                 end_at = #{endAt},
                 duration_minutes = #{durationMinutes},
@@ -169,8 +171,22 @@ public interface ExamMapper {
             SELECT
             """ + COLUMNS + """
             FROM exam e
-            JOIN exam_candidate ec ON ec.exam_id = e.id
-            WHERE ec.user_id = #{userId}
+            WHERE (
+                (e.assignment_mode = 'INDIVIDUAL' AND EXISTS (
+                    SELECT 1 FROM exam_candidate ec
+                    WHERE ec.exam_id = e.id AND ec.user_id = #{userId}
+                ))
+                OR
+                (e.assignment_mode = 'CLASS' AND EXISTS (
+                    SELECT 1
+                    FROM exam_class_scope ecs
+                    INNER JOIN class_member cm
+                      ON cm.class_id = ecs.class_id AND cm.status = 'ACTIVE'
+                    INNER JOIN learning_class lc
+                      ON lc.id = ecs.class_id AND lc.status = 'ACTIVE' AND lc.deleted = 0
+                    WHERE ecs.exam_id = e.id AND cm.user_id = #{userId}
+                ))
+            )
               AND e.deleted = 0
               AND e.status IN ('PUBLISHED', 'ONGOING', 'FINISHED')
             ORDER BY e.start_at DESC, e.id DESC

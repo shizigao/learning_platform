@@ -13,6 +13,7 @@ import {
 } from '@/api/exam'
 import PublisherExamNav from '@/components/PublisherExamNav.vue'
 import SectionPageHeader from '@/components/SectionPageHeader.vue'
+import { useAuthStore } from '@/stores/auth'
 import type {
   ExamGradingAttempt,
   ExamGradingDetail,
@@ -24,6 +25,7 @@ import type {
 } from '@/types/exam'
 
 const route = useRoute()
+const authStore = useAuthStore()
 const examId = Number(route.params.id)
 const loading = ref(false)
 const detailLoading = ref(false)
@@ -44,6 +46,16 @@ const typeLabels: Record<QuestionType, string> = {
 }
 const pendingCount = computed(() =>
   detail.value?.questions.filter((item) => item.gradingStatus === 'PENDING_REVIEW').length ?? 0,
+)
+const canOpenAiAnalysis = computed(() =>
+  Boolean(
+    exam.value &&
+      statistics.value &&
+      exam.value.exam.publisherId === authStore.user?.id &&
+      new Date(exam.value.exam.endAt).getTime() <= Date.now() &&
+      statistics.value.submittedCount > 0 &&
+      statistics.value.gradedCount >= statistics.value.submittedCount,
+  ),
 )
 
 function displayTime(value?: string): string {
@@ -183,7 +195,14 @@ onMounted(load)
         eyebrow="GRADING & ANALYTICS"
         :title="exam?.exam.name || '阅卷与统计'"
         description="批改主观题、确认最终成绩，并查看考试参与和答题质量"
-      />
+      >
+        <RouterLink
+          v-if="canOpenAiAnalysis"
+          :to="`/publisher/exams/${examId}/grading/ai-analysis`"
+        >
+          <el-button type="primary">AI 分析</el-button>
+        </RouterLink>
+      </SectionPageHeader>
 
       <div v-loading="loading">
         <template v-if="statistics">

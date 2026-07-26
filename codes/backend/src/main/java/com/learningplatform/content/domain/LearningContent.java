@@ -9,11 +9,13 @@ public class LearningContent extends BaseEntity {
     private Long publisherId;
     private String publisherName;
     private Long categoryId;
+    private String categoryName;
     private String title;
     private String summary;
     private ContentType contentType;
     private String articleBody;
     private Long coverFileId;
+    private ContentDistributionMode distributionMode;
     private Boolean free;
     private BigDecimal price;
     private ContentStatus status;
@@ -47,6 +49,14 @@ public class LearningContent extends BaseEntity {
 
     public void setCategoryId(Long categoryId) {
         this.categoryId = categoryId;
+    }
+
+    public String getCategoryName() {
+        return categoryName;
+    }
+
+    public void setCategoryName(String categoryName) {
+        this.categoryName = categoryName;
     }
 
     public String getTitle() {
@@ -87,6 +97,14 @@ public class LearningContent extends BaseEntity {
 
     public void setCoverFileId(Long coverFileId) {
         this.coverFileId = coverFileId;
+    }
+
+    public ContentDistributionMode getDistributionMode() {
+        return distributionMode;
+    }
+
+    public void setDistributionMode(ContentDistributionMode distributionMode) {
+        this.distributionMode = distributionMode;
     }
 
     public Boolean getFree() {

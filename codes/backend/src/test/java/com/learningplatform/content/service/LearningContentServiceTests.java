@@ -63,6 +63,7 @@ class LearningContentServiceTests {
                 request("Spring 安全入门", ContentType.ARTICLE, true, "完整正文")
         );
         assertThat(draft.status()).isEqualTo(ContentStatus.DRAFT);
+        assertThat(draft.contentType()).isEqualTo(ContentType.GENERAL);
         assertThat(contentService.listPublished(new ContentListQuery()).total()).isZero();
 
         assertThat(contentService.submit(draft.id(), publisher.getId()).status())

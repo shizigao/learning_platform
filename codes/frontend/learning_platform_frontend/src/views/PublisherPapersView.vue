@@ -8,6 +8,7 @@ import {
   deletePaper,
   getPaper,
   listPapers,
+  listQuestionBanks,
   listQuestions,
   replacePaperQuestions,
   updatePaper,
@@ -20,6 +21,8 @@ import type {
   ExamPaperStatus,
   ExamPaperSummary,
   Question,
+  QuestionBank,
+  QuestionPage,
   QuestionType,
 } from '@/types/exam'
 
@@ -55,8 +58,19 @@ const editorLoading = ref(false)
 const saving = ref(false)
 const editingPaperId = ref<number>()
 const paperForm = reactive({ name: '', description: '' })
-const allQuestions = ref<Question[]>([])
-const questionKeyword = ref('')
+const banks = ref<QuestionBank[]>([])
+const questionPage = ref<QuestionPage>({
+  items: [],
+  total: 0,
+  pageNumber: 1,
+  pageSize: 20,
+  totalPages: 0,
+})
+const questionLoading = ref(false)
+const questionFilters = reactive<{ bankId?: number; keyword: string; pageNumber: number }>({
+  keyword: '',
+  pageNumber: 1,
+})
 const selectedQuestions = ref<SelectedQuestion[]>([])
 
 const previewVisible = ref(false)
@@ -65,12 +79,7 @@ const preview = ref<ExamPaperDetail>()
 
 const availableQuestions = computed(() => {
   const selectedIds = new Set(selectedQuestions.value.map((item) => item.questionId))
-  const keyword = questionKeyword.value.trim().toLowerCase()
-  return allQuestions.value.filter(
-    (question) =>
-      !selectedIds.has(question.id) &&
-      (!keyword || question.stem.toLowerCase().includes(keyword)),
-  )
+  return questionPage.value.items.filter((question) => !selectedIds.has(question.id))
 })
 const totalScore = computed(() =>
   selectedQuestions.value.reduce((sum, question) => sum + Number(question.score || 0), 0),
@@ -87,14 +96,25 @@ async function load(): Promise<void> {
   }
 }
 
-async function loadAllQuestions(): Promise<void> {
-  const first = await listQuestions({ pageNumber: 1, pageSize: 100 })
-  const items = [...first.items]
-  for (let pageNumber = 2; pageNumber <= first.totalPages; pageNumber += 1) {
-    const next = await listQuestions({ pageNumber, pageSize: 100 })
-    items.push(...next.items)
+async function loadQuestionPool(): Promise<void> {
+  questionLoading.value = true
+  try {
+    questionPage.value = await listQuestions({
+      bankId: questionFilters.bankId,
+      keyword: questionFilters.keyword.trim() || undefined,
+      pageNumber: questionFilters.pageNumber,
+      pageSize: 20,
+    })
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '题目加载失败')
+  } finally {
+    questionLoading.value = false
   }
-  allQuestions.value = items
+}
+
+function searchQuestionPool(): void {
+  questionFilters.pageNumber = 1
+  void loadQuestionPool()
 }
 
 async function openEditor(paper?: ExamPaperSummary): Promise<void> {
@@ -103,9 +123,13 @@ async function openEditor(paper?: ExamPaperSummary): Promise<void> {
   editingPaperId.value = paper?.id
   paperForm.name = paper?.name ?? ''
   paperForm.description = paper?.description ?? ''
+  questionFilters.bankId = undefined
+  questionFilters.keyword = ''
+  questionFilters.pageNumber = 1
   selectedQuestions.value = []
   try {
-    await loadAllQuestions()
+    const [loadedBanks] = await Promise.all([listQuestionBanks(), loadQuestionPool()])
+    banks.value = loadedBanks
     if (paper) {
       const detail = await getPaper(paper.id)
       selectedQuestions.value = detail.questions.map((item) => ({
@@ -221,8 +245,8 @@ onMounted(load)
     <div class="page-container">
       <PublisherExamNav />
       <SectionPageHeader
-        eyebrow="FIXED PAPER"
-        title="固定试卷"
+        eyebrow="EXAM PAPER"
+        title="试卷"
         description="从自己的题库手工选题，设置顺序与分值并核对试卷快照"
       >
         <el-button type="primary" :icon="Plus" @click="openEditor()">新建试卷</el-button>
@@ -276,7 +300,7 @@ onMounted(load)
 
     <el-dialog
       v-model="editorVisible"
-      :title="editingPaperId ? '编辑固定试卷' : '新建固定试卷'"
+      :title="editingPaperId ? '编辑试卷' : '新建试卷'"
       width="min(1100px, 94vw)"
       top="5vh"
     >
@@ -287,15 +311,41 @@ onMounted(load)
         </div>
         <div class="paper-editor">
           <section class="question-pool">
-            <div class="panel-title"><strong>可选题目</strong><span>{{ availableQuestions.length }} 道</span></div>
-            <el-input v-model="questionKeyword" clearable placeholder="搜索题干" />
-            <div class="question-list">
+            <div class="panel-title"><strong>可选题目</strong><span>共 {{ questionPage.total }} 道</span></div>
+            <div class="question-filters">
+              <el-select
+                v-model="questionFilters.bankId"
+                clearable
+                placeholder="全部题库"
+                @change="searchQuestionPool"
+              >
+                <el-option v-for="bank in banks" :key="bank.id" :label="bank.name" :value="bank.id" />
+              </el-select>
+              <el-input
+                v-model="questionFilters.keyword"
+                clearable
+                placeholder="搜索题干"
+                @keyup.enter="searchQuestionPool"
+              />
+              <el-button type="primary" @click="searchQuestionPool">查询</el-button>
+            </div>
+            <div v-loading="questionLoading" class="question-list">
               <button v-for="question in availableQuestions" :key="question.id" type="button" @click="addQuestion(question)">
                 <el-tag size="small">{{ typeLabels[question.questionType] }}</el-tag>
                 <span>{{ question.stem }}</span><strong>＋</strong>
               </button>
               <el-empty v-if="availableQuestions.length === 0" :image-size="60" description="没有可添加的题目" />
             </div>
+            <el-pagination
+              v-if="questionPage.total > questionPage.pageSize"
+              v-model:current-page="questionFilters.pageNumber"
+              class="question-pagination"
+              small
+              layout="prev, pager, next"
+              :page-size="questionPage.pageSize"
+              :total="questionPage.total"
+              @current-change="loadQuestionPool"
+            />
           </section>
           <section class="selected-panel">
             <div class="panel-title">
@@ -354,7 +404,9 @@ onMounted(load)
 .paper-editor { display: grid; min-height: 510px; gap: 16px; grid-template-columns: 38% 62%; }
 .question-pool, .selected-panel { overflow: hidden; border: 1px solid var(--lp-border); border-radius: 14px; padding: 16px; }
 .panel-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }.panel-title span { color: var(--lp-text-secondary); font-size: 12px; }
+.question-filters { display: grid; gap: 8px; grid-template-columns: 130px minmax(150px, 1fr) auto; }
 .question-list, .selected-list { overflow-y: auto; max-height: 440px; margin-top: 12px; }
+.question-pagination { justify-content: center; margin-top: 12px; }
 .question-list button { display: grid; width: 100%; border: 0; border-bottom: 1px solid var(--lp-border); align-items: center; gap: 8px; background: #fff; cursor: pointer; grid-template-columns: auto 1fr auto; padding: 12px 4px; text-align: left; }
 .question-list button:hover { background: #f8faff; }.question-list button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .selected-item { display: grid; border-bottom: 1px solid var(--lp-border); align-items: center; gap: 9px; grid-template-columns: 28px minmax(180px, 1fr) 125px 92px; padding: 12px 0; }
@@ -363,5 +415,5 @@ onMounted(load)
 .sort-actions { display: flex; }.preview { min-height: 260px; }.preview > p { color: var(--lp-text-secondary); }
 .preview-question { border-top: 1px solid var(--lp-border); margin-top: 24px; padding-top: 18px; }.preview-question h3 { font-size: 16px; line-height: 1.7; }.preview-question h3 small { color: var(--lp-primary); }
 .preview-question p { margin-left: 18px; color: #475467; }.answer, .analysis { border-radius: 8px; margin-top: 8px; background: #f7f9fc; padding: 10px 12px; }.analysis { color: var(--lp-text-secondary); }
-@media (max-width: 800px) { .toolbar, .paper-meta, .paper-editor { grid-template-columns: 1fr; }.paper-editor { min-height: auto; }.selected-item { grid-template-columns: 28px 1fr; }.selected-item > .el-input-number, .sort-actions { grid-column: 2; } }
+@media (max-width: 800px) { .toolbar, .paper-meta, .paper-editor, .question-filters { grid-template-columns: 1fr; }.paper-editor { min-height: auto; }.selected-item { grid-template-columns: 28px 1fr; }.selected-item > .el-input-number, .sort-actions { grid-column: 2; } }
 </style>

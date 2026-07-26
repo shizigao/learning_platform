@@ -10,6 +10,7 @@ public class Exam extends BaseEntity {
     private Long paperId;
     private String name;
     private String instructions;
+    private ExamAssignmentMode assignmentMode;
     private LocalDateTime startAt;
     private LocalDateTime endAt;
     private Integer durationMinutes;
@@ -51,6 +52,14 @@ public class Exam extends BaseEntity {
 
     public void setInstructions(String instructions) {
         this.instructions = instructions;
+    }
+
+    public ExamAssignmentMode getAssignmentMode() {
+        return assignmentMode;
+    }
+
+    public void setAssignmentMode(ExamAssignmentMode assignmentMode) {
+        this.assignmentMode = assignmentMode;
     }
 
     public LocalDateTime getStartAt() {

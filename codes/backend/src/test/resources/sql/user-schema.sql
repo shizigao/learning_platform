@@ -1,3 +1,7 @@
+DROP TABLE IF EXISTS offline_teacher_recommendation;
+DROP TABLE IF EXISTS offline_student_preference;
+DROP TABLE IF EXISTS offline_teacher_profile;
+DROP TABLE IF EXISTS offline_teacher_application;
 DROP TABLE IF EXISTS ai_message;
 DROP TABLE IF EXISTS ai_usage_record;
 DROP TABLE IF EXISTS ai_summary;
@@ -7,6 +11,7 @@ DROP TABLE IF EXISTS exam_result;
 DROP TABLE IF EXISTS exam_answer;
 DROP TABLE IF EXISTS exam_attempt;
 DROP TABLE IF EXISTS exam_candidate;
+DROP TABLE IF EXISTS exam_class_scope;
 DROP TABLE IF EXISTS exam;
 DROP TABLE IF EXISTS exam_paper_question;
 DROP TABLE IF EXISTS exam_paper;
@@ -23,9 +28,14 @@ DROP TABLE IF EXISTS content_like;
 DROP TABLE IF EXISTS content_favorite;
 DROP TABLE IF EXISTS learning_progress;
 DROP TABLE IF EXISTS content_file;
+DROP TABLE IF EXISTS content_class_scope;
 DROP TABLE IF EXISTS learning_content;
 DROP TABLE IF EXISTS content_category;
+DROP TABLE IF EXISTS class_announcement;
+DROP TABLE IF EXISTS class_member;
+DROP TABLE IF EXISTS learning_class;
 DROP TABLE IF EXISTS operation_log;
+DROP TABLE IF EXISTS user_avatar;
 DROP TABLE IF EXISTS user_role;
 DROP TABLE IF EXISTS role;
 DROP TABLE IF EXISTS `user`;
@@ -46,6 +56,20 @@ CREATE TABLE `user` (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE user_avatar (
+    user_id BIGINT PRIMARY KEY,
+    bucket_name VARCHAR(128) NOT NULL,
+    object_name VARCHAR(512) NOT NULL UNIQUE,
+    original_name VARCHAR(255) NOT NULL,
+    content_type VARCHAR(100) NOT NULL,
+    extension VARCHAR(16) NOT NULL,
+    size_bytes BIGINT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT fk_user_avatar_user
+        FOREIGN KEY (user_id) REFERENCES `user` (id) ON DELETE CASCADE
 );
 
 CREATE TABLE role (

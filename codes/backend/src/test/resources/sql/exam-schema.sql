@@ -1,10 +1,41 @@
 DROP TABLE IF EXISTS exam_answer;
 DROP TABLE IF EXISTS exam_attempt;
 DROP TABLE IF EXISTS exam_candidate;
+DROP TABLE IF EXISTS exam_class_scope;
 DROP TABLE IF EXISTS exam;
 DROP TABLE IF EXISTS exam_paper_question;
 DROP TABLE IF EXISTS exam_paper;
 DROP TABLE IF EXISTS user_entitlement;
+
+CREATE TABLE learning_class (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    owner_id BIGINT NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    description VARCHAR(1000),
+    invite_code VARCHAR(16) NOT NULL UNIQUE,
+    invite_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+    version INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT fk_test_exam_class_owner FOREIGN KEY (owner_id) REFERENCES `user` (id)
+);
+
+CREATE TABLE class_member (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    class_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    role VARCHAR(32) NOT NULL DEFAULT 'MEMBER',
+    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+    joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    left_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_test_exam_class_member UNIQUE (class_id, user_id),
+    CONSTRAINT fk_test_exam_class_member_class FOREIGN KEY (class_id) REFERENCES learning_class (id),
+    CONSTRAINT fk_test_exam_class_member_user FOREIGN KEY (user_id) REFERENCES `user` (id)
+);
 
 CREATE TABLE exam_paper (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -44,6 +75,7 @@ CREATE TABLE exam (
     paper_id BIGINT NOT NULL,
     name VARCHAR(200) NOT NULL,
     instructions VARCHAR(5000),
+    assignment_mode VARCHAR(32) NOT NULL DEFAULT 'INDIVIDUAL',
     start_at TIMESTAMP NOT NULL,
     end_at TIMESTAMP NOT NULL,
     duration_minutes INT NOT NULL,
@@ -59,6 +91,15 @@ CREATE TABLE exam (
     deleted BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_test_exam_publisher FOREIGN KEY (publisher_id) REFERENCES `user` (id),
     CONSTRAINT fk_test_exam_paper FOREIGN KEY (paper_id) REFERENCES exam_paper (id)
+);
+
+CREATE TABLE exam_class_scope (
+    exam_id BIGINT NOT NULL,
+    class_id BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (exam_id, class_id),
+    CONSTRAINT fk_test_exam_scope_exam FOREIGN KEY (exam_id) REFERENCES exam (id),
+    CONSTRAINT fk_test_exam_scope_class FOREIGN KEY (class_id) REFERENCES learning_class (id)
 );
 
 CREATE TABLE exam_candidate (

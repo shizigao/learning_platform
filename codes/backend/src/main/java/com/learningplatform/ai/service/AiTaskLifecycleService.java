@@ -102,7 +102,7 @@ public class AiTaskLifecycleService {
             AiTaskType taskType
     ) {
         if (!task.getUserId().equals(userId)
-                || !task.getContentId().equals(contentId)
+                || !java.util.Objects.equals(task.getContentId(), contentId)
                 || !java.util.Objects.equals(task.getConversationId(), conversationId)
                 || task.getTaskType() != taskType) {
             throw new BusinessException(

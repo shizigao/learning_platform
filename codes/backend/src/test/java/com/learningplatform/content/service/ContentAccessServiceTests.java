@@ -8,6 +8,7 @@ import com.learningplatform.content.domain.LearningContent;
 import com.learningplatform.content.mapper.ContentFileMapper;
 import com.learningplatform.content.mapper.LearningContentMapper;
 import com.learningplatform.content.storage.MinioStorageService;
+import com.learningplatform.classroom.mapper.ClassScopeMapper;
 import com.learningplatform.order.service.EntitlementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ class ContentAccessServiceTests {
     private ContentFileMapper fileMapper;
     private EntitlementService entitlementService;
     private MinioStorageService storageService;
+    private ClassScopeMapper classScopeMapper;
     private ContentAccessService accessService;
     private LearningContent paidContent;
     private ContentFile contentFile;
@@ -36,11 +38,13 @@ class ContentAccessServiceTests {
         fileMapper = mock(ContentFileMapper.class);
         entitlementService = mock(EntitlementService.class);
         storageService = mock(MinioStorageService.class);
+        classScopeMapper = mock(ClassScopeMapper.class);
         accessService = new ContentAccessService(
                 contentMapper,
                 fileMapper,
                 entitlementService,
-                storageService
+                storageService,
+                classScopeMapper
         );
 
         paidContent = new LearningContent();

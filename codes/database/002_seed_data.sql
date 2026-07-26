@@ -96,6 +96,39 @@ ON DUPLICATE KEY UPDATE
     `status` = 'ACTIVE',
     `sort_order` = 40;
 
+-- 考试结果 AI 分析次数包
+INSERT INTO `product` (`product_code`, `product_type`, `name`, `description`, `quantity`, `price`, `status`, `sort_order`)
+VALUES ('EXAM_OVERALL_AI_5', 'EXAM_OVERALL_AI_PACKAGE', '考试整体AI分析5次包', '可生成5次考试整体AI分析报告，生成成功后扣除次数', 5, 19.90, 'ACTIVE', 50)
+ON DUPLICATE KEY UPDATE
+    `product_type` = 'EXAM_OVERALL_AI_PACKAGE',
+    `name` = '考试整体AI分析5次包',
+    `description` = '可生成5次考试整体AI分析报告，生成成功后扣除次数',
+    `quantity` = 5, `price` = 19.90, `status` = 'ACTIVE', `sort_order` = 50;
+
+INSERT INTO `product` (`product_code`, `product_type`, `name`, `description`, `quantity`, `price`, `status`, `sort_order`)
+VALUES ('EXAM_OVERALL_AI_20', 'EXAM_OVERALL_AI_PACKAGE', '考试整体AI分析20次包', '可生成20次考试整体AI分析报告，生成成功后扣除次数', 20, 59.90, 'ACTIVE', 60)
+ON DUPLICATE KEY UPDATE
+    `product_type` = 'EXAM_OVERALL_AI_PACKAGE',
+    `name` = '考试整体AI分析20次包',
+    `description` = '可生成20次考试整体AI分析报告，生成成功后扣除次数',
+    `quantity` = 20, `price` = 59.90, `status` = 'ACTIVE', `sort_order` = 60;
+
+INSERT INTO `product` (`product_code`, `product_type`, `name`, `description`, `quantity`, `price`, `status`, `sort_order`)
+VALUES ('EXAM_PERSONAL_AI_10', 'EXAM_PERSONAL_AI_PACKAGE', '考试个人AI分析10次包', '可生成10次考试个人AI分析报告，生成成功后扣除次数', 10, 9.90, 'ACTIVE', 70)
+ON DUPLICATE KEY UPDATE
+    `product_type` = 'EXAM_PERSONAL_AI_PACKAGE',
+    `name` = '考试个人AI分析10次包',
+    `description` = '可生成10次考试个人AI分析报告，生成成功后扣除次数',
+    `quantity` = 10, `price` = 9.90, `status` = 'ACTIVE', `sort_order` = 70;
+
+INSERT INTO `product` (`product_code`, `product_type`, `name`, `description`, `quantity`, `price`, `status`, `sort_order`)
+VALUES ('EXAM_PERSONAL_AI_50', 'EXAM_PERSONAL_AI_PACKAGE', '考试个人AI分析50次包', '可生成50次考试个人AI分析报告，生成成功后扣除次数', 50, 39.90, 'ACTIVE', 80)
+ON DUPLICATE KEY UPDATE
+    `product_type` = 'EXAM_PERSONAL_AI_PACKAGE',
+    `name` = '考试个人AI分析50次包',
+    `description` = '可生成50次考试个人AI分析报告，生成成功后扣除次数',
+    `quantity` = 50, `price` = 39.90, `status` = 'ACTIVE', `sort_order` = 80;
+
 -- 非敏感系统配置。DeepSeek API Key 必须只通过环境变量提供。
 INSERT INTO `system_config` (`config_key`, `config_value`, `value_type`, `description`, `public_readable`)
 VALUES ('ai.enabled', 'true', 'BOOLEAN', '是否启用AI学习功能', 0)
@@ -120,6 +153,14 @@ ON DUPLICATE KEY UPDATE `config_value` = '1', `value_type` = 'INTEGER', `descrip
 INSERT INTO `system_config` (`config_key`, `config_value`, `value_type`, `description`, `public_readable`)
 VALUES ('exam.publish.quota_cost', '1', 'INTEGER', '每发布一场考试扣减次数', 1)
 ON DUPLICATE KEY UPDATE `config_value` = '1', `value_type` = 'INTEGER', `description` = '每发布一场考试扣减次数', `public_readable` = 1;
+
+INSERT INTO `system_config` (`config_key`, `config_value`, `value_type`, `description`, `public_readable`)
+VALUES ('ai.exam.overall-analysis.quota-cost', '1', 'INTEGER', '每次考试整体AI分析成功后扣减次数', 1)
+ON DUPLICATE KEY UPDATE `config_value` = '1', `value_type` = 'INTEGER', `description` = '每次考试整体AI分析成功后扣减次数', `public_readable` = 1;
+
+INSERT INTO `system_config` (`config_key`, `config_value`, `value_type`, `description`, `public_readable`)
+VALUES ('ai.exam.personal-analysis.quota-cost', '1', 'INTEGER', '每次考试个人AI分析成功后扣减次数', 1)
+ON DUPLICATE KEY UPDATE `config_value` = '1', `value_type` = 'INTEGER', `description` = '每次考试个人AI分析成功后扣减次数', `public_readable` = 1;
 
 INSERT INTO `system_config` (`config_key`, `config_value`, `value_type`, `description`, `public_readable`)
 VALUES ('payment.mock.enabled', 'true', 'BOOLEAN', 'MVP是否启用模拟支付', 1)

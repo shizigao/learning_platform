@@ -86,6 +86,7 @@ class ContentControllerIntegrationTests {
                         .content(contentJson()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("DRAFT"))
+                .andExpect(jsonPath("$.data.contentType").value("GENERAL"))
                 .andReturn();
         long contentId = responseData(createResult).path("id").asLong();
 
@@ -111,6 +112,23 @@ class ContentControllerIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
 
+        mockMvc.perform(get("/api/publisher/contents/reference-candidates")
+                        .header(AUTHORIZATION, bearer(publisherToken))
+                        .param("titleKeyword", "Spring"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].id").value(contentId));
+        mockMvc.perform(get("/api/publisher/contents/reference-candidates")
+                        .header(AUTHORIZATION, bearer(publisherToken))
+                        .param("publisherKeyword", "content_publisher"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1));
+        mockMvc.perform(get("/api/publisher/contents/reference-candidates")
+                        .header(AUTHORIZATION, bearer(publisherToken))
+                        .param("excludeContentId", String.valueOf(contentId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(0));
+
         mockMvc.perform(get("/api/contents")
                         .header(AUTHORIZATION, bearer(userToken))
                         .param("keyword", "Spring")
@@ -128,6 +146,18 @@ class ContentControllerIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.articleBody").value("这是完整正文"))
                 .andExpect(jsonPath("$.data.publisherName").value("content_publisher"));
+    }
+
+    @Test
+    void searchesEnabledCategoriesWithPagination() throws Exception {
+        mockMvc.perform(get("/api/categories/search")
+                        .header(AUTHORIZATION, bearer(userToken))
+                        .param("keyword", "编程")
+                        .param("pageNumber", "1")
+                        .param("pageSize", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].slug").value("computer-programming"));
     }
 
     @Test

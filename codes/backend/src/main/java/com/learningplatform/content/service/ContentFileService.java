@@ -98,6 +98,12 @@ public class ContentFileService {
         if (!contentId.equals(file.getContentId())) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "资料文件不存在");
         }
+        if (isReferencedByBody(content.getArticleBody(), fileId)) {
+            throw new BusinessException(
+                    ErrorCode.CONFLICT,
+                    "该文件正在正文中使用，请先删除正文中的图片或文件引用"
+            );
+        }
         if (fileMapper.softDelete(fileId) != 1) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "资料文件不存在");
         }
@@ -211,5 +217,13 @@ public class ContentFileService {
         } catch (RuntimeException cleanupException) {
             log.error("Unable to remove MinIO object after database failure: {}", objectName, cleanupException);
         }
+    }
+
+    private boolean isReferencedByBody(String articleBody, Long fileId) {
+        if (articleBody == null || articleBody.isBlank() || fileId == null) {
+            return false;
+        }
+        return articleBody.contains("content-image://" + fileId)
+                || articleBody.contains("content-file://" + fileId);
     }
 }

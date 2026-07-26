@@ -109,6 +109,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function refreshProfile(): Promise<UserProfile | null> {
+    if (!getAccessToken()) return null
+    user.value = await getCurrentUser()
+    return user.value
+  }
+
   return {
     user,
     loading,
@@ -121,6 +127,7 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     logout,
     updateProfile,
+    refreshProfile,
     clearSession,
   }
 })

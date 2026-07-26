@@ -40,6 +40,45 @@ public interface ContentCategoryMapper {
     List<ContentCategory> findAll();
 
     @Select("""
+            <script>
+            SELECT COUNT(*)
+            FROM content_category
+            WHERE enabled = 1 AND deleted = 0
+            <if test='keyword != null'>
+              AND (
+                name LIKE CONCAT('%', #{keyword}, '%')
+                OR slug LIKE CONCAT('%', #{keyword}, '%')
+                OR description LIKE CONCAT('%', #{keyword}, '%')
+              )
+            </if>
+            </script>
+            """)
+    long countEnabled(@Param("keyword") String keyword);
+
+    @Select("""
+            <script>
+            SELECT
+            """ + COLUMNS + """
+            FROM content_category
+            WHERE enabled = 1 AND deleted = 0
+            <if test='keyword != null'>
+              AND (
+                name LIKE CONCAT('%', #{keyword}, '%')
+                OR slug LIKE CONCAT('%', #{keyword}, '%')
+                OR description LIKE CONCAT('%', #{keyword}, '%')
+              )
+            </if>
+            ORDER BY sort_order ASC, id ASC
+            LIMIT #{limit} OFFSET #{offset}
+            </script>
+            """)
+    List<ContentCategory> searchEnabled(
+            @Param("keyword") String keyword,
+            @Param("offset") long offset,
+            @Param("limit") int limit
+    );
+
+    @Select("""
             SELECT COUNT(*) > 0
             FROM content_category
             WHERE slug = #{slug} AND deleted = 0

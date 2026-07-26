@@ -71,8 +71,12 @@ onMounted(load)
         <el-table-column label="资料" min-width="260">
           <template #default="{ row }"><strong>{{ row.title }}</strong><p class="summary">{{ row.summary || '暂无简介' }}</p></template>
         </el-table-column>
-        <el-table-column prop="contentType" label="类型" width="110" />
-        <el-table-column label="价格" width="110"><template #default="{ row }">{{ row.isFree ? '免费' : `¥${Number(row.price).toFixed(2)}` }}</template></el-table-column>
+        <el-table-column label="发放方式" width="120">
+          <template #default="{ row }">
+            <el-tag v-if="row.distributionMode === 'CLASS'" type="warning">班级发放</el-tag>
+            <span v-else>{{ row.isFree ? '公开 · 免费' : `公开 · ¥${Number(row.price).toFixed(2)}` }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="120"><template #default="{ row }"><ContentStatusTag :status="row.status" /></template></el-table-column>
         <el-table-column label="数据" width="150"><template #default="{ row }">{{ row.viewCount }} 浏览 · {{ row.likeCount }} 赞</template></el-table-column>
         <el-table-column label="操作" width="230" fixed="right">

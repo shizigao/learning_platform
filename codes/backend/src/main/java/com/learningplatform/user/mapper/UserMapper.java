@@ -47,6 +47,33 @@ public interface UserMapper {
     List<User> searchActive(String keyword);
 
     @Select("""
+            SELECT COUNT(*)
+            FROM `user`
+            WHERE status = 'ACTIVE' AND deleted = 0
+              AND (#{keyword} IS NULL
+                   OR username LIKE CONCAT('%', #{keyword}, '%')
+                   OR nickname LIKE CONCAT('%', #{keyword}, '%'))
+            """)
+    long countActive(@Param("keyword") String keyword);
+
+    @Select("""
+            SELECT
+            """ + USER_COLUMNS + """
+            FROM `user`
+            WHERE status = 'ACTIVE' AND deleted = 0
+              AND (#{keyword} IS NULL
+                   OR username LIKE CONCAT('%', #{keyword}, '%')
+                   OR nickname LIKE CONCAT('%', #{keyword}, '%'))
+            ORDER BY username ASC, id ASC
+            LIMIT #{limit} OFFSET #{offset}
+            """)
+    List<User> findActivePage(
+            @Param("keyword") String keyword,
+            @Param("offset") long offset,
+            @Param("limit") int limit
+    );
+
+    @Select("""
             <script>
             SELECT COUNT(*)
             FROM `user` u
@@ -147,6 +174,9 @@ public interface UserMapper {
             WHERE id = #{id} AND deleted = 0
             """)
     int updateProfile(User user);
+
+    @Update("UPDATE `user` SET avatar_url = NULL WHERE id = #{userId} AND deleted = 0")
+    int clearAvatarUrl(Long userId);
 
     @Update("""
             UPDATE `user`

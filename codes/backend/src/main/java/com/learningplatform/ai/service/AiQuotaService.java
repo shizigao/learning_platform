@@ -29,17 +29,33 @@ public class AiQuotaService {
     }
 
     public void requireAvailable(Long userId, int quantity) {
+        requireAvailable(userId, EntitlementType.AI_QUOTA, quantity);
+    }
+
+    public void requireAvailable(
+            Long userId,
+            EntitlementType entitlementType,
+            int quantity
+    ) {
         if (quantity <= 0
                 || entitlementMapper.sumAvailableQuota(
                         userId,
-                        EntitlementType.AI_QUOTA
+                        entitlementType
                 ) < quantity) {
-            throw noQuota();
+            throw noQuota(entitlementType);
         }
     }
 
     @Transactional
     public AiUsageRecord consume(AiTask task) {
+        return consume(task, EntitlementType.AI_QUOTA);
+    }
+
+    @Transactional
+    public AiUsageRecord consume(
+            AiTask task,
+            EntitlementType entitlementType
+    ) {
         String businessNo = businessNo(task.getId());
         AiUsageRecord existing = usageMapper.findByBusinessNo(businessNo)
                 .orElse(null);
@@ -56,12 +72,12 @@ public class AiQuotaService {
         UserEntitlement entitlement = entitlementMapper
                 .findAvailableQuotaForUpdate(
                         task.getUserId(),
-                        EntitlementType.AI_QUOTA
+                        entitlementType
                 )
-                .orElseThrow(this::noQuota);
+                .orElseThrow(() -> noQuota(entitlementType));
         int balanceBefore = entitlementMapper.sumAvailableQuota(
                 task.getUserId(),
-                EntitlementType.AI_QUOTA
+                entitlementType
         );
         if (balanceBefore < quantity
                 || entitlementMapper.consume(
@@ -69,11 +85,11 @@ public class AiQuotaService {
                         entitlement.getVersion(),
                         quantity
                 ) != 1) {
-            throw noQuota();
+            throw noQuota(entitlementType);
         }
         int balanceAfter = entitlementMapper.sumAvailableQuota(
                 task.getUserId(),
-                EntitlementType.AI_QUOTA
+                entitlementType
         );
 
         AiUsageRecord record = new AiUsageRecord();
@@ -110,10 +126,15 @@ public class AiQuotaService {
         return "AI_TASK_" + taskId;
     }
 
-    private BusinessException noQuota() {
+    private BusinessException noQuota(EntitlementType entitlementType) {
+        String message = switch (entitlementType) {
+            case EXAM_OVERALL_AI_QUOTA -> "考试整体 AI 分析次数不足，请先购买次数包";
+            case EXAM_PERSONAL_AI_QUOTA -> "考试个人 AI 分析次数不足，请先购买次数包";
+            default -> "AI 可用次数不足，请先购买 AI 次数包";
+        };
         return new BusinessException(
                 ErrorCode.FORBIDDEN,
-                "AI 可用次数不足，请先购买 AI 次数包"
+                message
         );
     }
 }

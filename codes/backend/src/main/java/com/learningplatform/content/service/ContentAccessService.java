@@ -4,6 +4,7 @@ import com.learningplatform.common.api.ErrorCode;
 import com.learningplatform.common.exception.BusinessException;
 import com.learningplatform.content.domain.ContentFile;
 import com.learningplatform.content.domain.ContentStatus;
+import com.learningplatform.content.domain.ContentDistributionMode;
 import com.learningplatform.content.domain.LearningContent;
 import com.learningplatform.content.mapper.ContentFileMapper;
 import com.learningplatform.content.mapper.LearningContentMapper;
@@ -12,6 +13,7 @@ import com.learningplatform.order.domain.EntitlementStatus;
 import com.learningplatform.order.domain.EntitlementType;
 import com.learningplatform.order.domain.UserEntitlement;
 import com.learningplatform.order.service.EntitlementService;
+import com.learningplatform.classroom.mapper.ClassScopeMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,32 +25,42 @@ public class ContentAccessService {
     private final ContentFileMapper fileMapper;
     private final EntitlementService entitlementService;
     private final MinioStorageService storageService;
+    private final ClassScopeMapper classScopeMapper;
 
     public ContentAccessService(
             LearningContentMapper contentMapper,
             ContentFileMapper fileMapper,
             EntitlementService entitlementService,
-            MinioStorageService storageService
+            MinioStorageService storageService,
+            ClassScopeMapper classScopeMapper
     ) {
         this.contentMapper = contentMapper;
         this.fileMapper = fileMapper;
         this.entitlementService = entitlementService;
         this.storageService = storageService;
+        this.classScopeMapper = classScopeMapper;
     }
 
     public boolean hasAccess(Long userId, boolean requesterAdmin, LearningContent content) {
         if (content.getStatus() != ContentStatus.PUBLISHED) {
             return false;
         }
-        if (requesterAdmin || content.getPublisherId().equals(userId) || Boolean.TRUE.equals(content.getFree())) {
+        if (requesterAdmin || content.getPublisherId().equals(userId)) {
             return true;
         }
+        if (content.getDistributionMode() == ContentDistributionMode.CLASS) {
+            return userId != null && classScopeMapper.hasContentAccess(content.getId(), userId);
+        }
+        if (Boolean.TRUE.equals(content.getFree())) return true;
         return entitlementService.hasActiveContentAccess(userId, content.getId());
     }
 
     public LearningContent requireAccess(Long contentId, Long userId, boolean requesterAdmin) {
         LearningContent content = getPublished(contentId);
         if (!hasAccess(userId, requesterAdmin, content)) {
+            if (content.getDistributionMode() == ContentDistributionMode.CLASS) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "仅资料发放班级的有效成员可以访问");
+            }
             throw new BusinessException(ErrorCode.FORBIDDEN, "购买该资料后才能访问正文或文件");
         }
         return content;

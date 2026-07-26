@@ -15,6 +15,7 @@ import com.learningplatform.user.domain.User;
 import com.learningplatform.user.domain.UserStatus;
 import com.learningplatform.user.service.RoleService;
 import com.learningplatform.user.service.UserService;
+import com.learningplatform.user.service.UserAvatarService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -30,19 +31,22 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenService tokenService;
     private final LoginProtectionService loginProtectionService;
+    private final UserAvatarService avatarService;
 
     public AuthService(
             UserService userService,
             RoleService roleService,
             PasswordEncoder passwordEncoder,
             JwtTokenService tokenService,
-            LoginProtectionService loginProtectionService
+            LoginProtectionService loginProtectionService,
+            UserAvatarService avatarService
     ) {
         this.userService = userService;
         this.roleService = roleService;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
         this.loginProtectionService = loginProtectionService;
+        this.avatarService = avatarService;
     }
 
     @Transactional
@@ -89,7 +93,7 @@ public class AuthService {
                 tokenService.issue(user, roles),
                 "Bearer",
                 tokenService.expiresInSeconds(),
-                UserProfileResponse.from(user, roles)
+                UserProfileResponse.from(user, roles, avatarService.avatarUrl(user))
         );
     }
 
@@ -130,7 +134,11 @@ public class AuthService {
     }
 
     private UserProfileResponse profile(User user) {
-        return UserProfileResponse.from(user, roleService.findRoleCodesByUserId(user.getId()));
+        return UserProfileResponse.from(
+                user,
+                roleService.findRoleCodesByUserId(user.getId()),
+                avatarService.avatarUrl(user)
+        );
     }
 
     private void validateUniqueProfile(

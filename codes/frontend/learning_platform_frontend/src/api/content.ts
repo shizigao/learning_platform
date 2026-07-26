@@ -4,6 +4,7 @@ import type {
   CategoryWritePayload,
   CommentPage,
   ContentCategory,
+  ContentCategoryPage,
   ContentDetail,
   ContentFile,
   ContentFileRole,
@@ -21,6 +22,22 @@ function data<T>(response: { data: ApiResponse<T> }): T {
 
 export async function listCategories(): Promise<ContentCategory[]> {
   return data(await http.get<ApiResponse<ContentCategory[]>>('/categories'))
+}
+
+export async function searchCategories(
+  keyword = '',
+  pageNumber = 1,
+  pageSize = 20,
+): Promise<ContentCategoryPage> {
+  return data(
+    await http.get<ApiResponse<ContentCategoryPage>>('/categories/search', {
+      params: { keyword: keyword.trim() || undefined, pageNumber, pageSize },
+    }),
+  )
+}
+
+export async function getCategory(categoryId: number): Promise<ContentCategory> {
+  return data(await http.get<ApiResponse<ContentCategory>>(`/categories/${categoryId}`))
 }
 
 export async function listContents(params: ContentListParams = {}): Promise<ContentPage> {
@@ -115,6 +132,26 @@ export async function listPublisherContents(params: ContentListParams = {}): Pro
   return data(await http.get<ApiResponse<ContentPage>>('/publisher/contents', { params }))
 }
 
+export async function listContentReferenceCandidates(
+  titleKeyword = '',
+  publisherKeyword = '',
+  excludeContentId?: number,
+  pageNumber = 1,
+  pageSize = 20,
+): Promise<ContentPage> {
+  return data(
+    await http.get<ApiResponse<ContentPage>>('/publisher/contents/reference-candidates', {
+      params: {
+        titleKeyword: titleKeyword.trim() || undefined,
+        publisherKeyword: publisherKeyword.trim() || undefined,
+        excludeContentId,
+        pageNumber,
+        pageSize,
+      },
+    }),
+  )
+}
+
 export async function getPublisherContent(contentId: number): Promise<ContentDetail> {
   return data(await http.get<ApiResponse<ContentDetail>>(`/publisher/contents/${contentId}`))
 }
@@ -159,6 +196,19 @@ export async function uploadContentFile(
 
 export async function deleteContentFile(contentId: number, fileId: number): Promise<void> {
   await http.delete(`/publisher/contents/${contentId}/files/${fileId}`)
+}
+
+export async function getPublisherContentFileUrl(
+  contentId: number,
+  fileId: number,
+  mode: 'preview' | 'download',
+): Promise<string> {
+  const result = data(
+    await http.get<ApiResponse<{ url: string }>>(
+      `/publisher/contents/${contentId}/files/${fileId}/${mode}-url`,
+    ),
+  )
+  return result.url
 }
 
 export async function listAdminCategories(): Promise<ContentCategory[]> {

@@ -1,6 +1,10 @@
 package com.learningplatform.exam.web;
 
 import com.learningplatform.auth.security.AuthenticationPrincipalResolver;
+import com.learningplatform.ai.dto.ExamAiAnalysisGenerateRequest;
+import com.learningplatform.ai.dto.ExamAiAnalysisPageResponse;
+import com.learningplatform.ai.dto.ExamAiAnalysisResponse;
+import com.learningplatform.ai.service.ExamAiAnalysisService;
 import com.learningplatform.common.api.ApiResponse;
 import com.learningplatform.exam.dto.CandidateExamResponse;
 import com.learningplatform.exam.dto.CandidateExamOverviewResponse;
@@ -37,19 +41,22 @@ public class CandidateExamController {
     private final ExamAnswerService answerService;
     private final ExamSubmissionService submissionService;
     private final ExamResultService resultService;
+    private final ExamAiAnalysisService aiAnalysisService;
 
     public CandidateExamController(
             ExamService examService,
             CandidateExamSessionService sessionService,
             ExamAnswerService answerService,
             ExamSubmissionService submissionService,
-            ExamResultService resultService
+            ExamResultService resultService,
+            ExamAiAnalysisService aiAnalysisService
     ) {
         this.examService = examService;
         this.sessionService = sessionService;
         this.answerService = answerService;
         this.submissionService = submissionService;
         this.resultService = resultService;
+        this.aiAnalysisService = aiAnalysisService;
     }
 
     @GetMapping
@@ -140,5 +147,28 @@ public class CandidateExamController {
     ) {
         Long userId = AuthenticationPrincipalResolver.require(authentication).userId();
         return ApiResponse.success(resultService.candidateResult(examId, userId));
+    }
+
+    @GetMapping("/{examId}/result/ai-analysis")
+    public ApiResponse<ExamAiAnalysisPageResponse> resultAiAnalysis(
+            Authentication authentication,
+            @PathVariable Long examId
+    ) {
+        Long userId = AuthenticationPrincipalResolver.require(authentication).userId();
+        return ApiResponse.success(aiAnalysisService.personalPage(examId, userId));
+    }
+
+    @PostMapping("/{examId}/result/ai-analysis")
+    public ApiResponse<ExamAiAnalysisResponse> generateResultAiAnalysis(
+            Authentication authentication,
+            @PathVariable Long examId,
+            @Valid @RequestBody ExamAiAnalysisGenerateRequest request
+    ) {
+        Long userId = AuthenticationPrincipalResolver.require(authentication).userId();
+        return ApiResponse.success(aiAnalysisService.generatePersonal(
+                examId,
+                userId,
+                request.requestId()
+        ));
     }
 }

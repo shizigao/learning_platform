@@ -5,6 +5,8 @@ import com.learningplatform.common.exception.BusinessException;
 import com.learningplatform.user.domain.User;
 import com.learningplatform.user.domain.UserStatus;
 import com.learningplatform.user.mapper.UserMapper;
+import com.learningplatform.common.page.PageQuery;
+import com.learningplatform.common.page.PageResult;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +31,14 @@ public class UserService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户不存在"));
     }
 
+    public User getRequiredActiveById(Long userId) {
+        User user = getRequiredById(userId);
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在或当前不可访问");
+        }
+        return user;
+    }
+
     public Optional<User> findByUsername(String username) {
         return userMapper.findByUsername(username);
     }
@@ -40,6 +50,17 @@ public class UserService {
     public List<User> searchActive(String keyword) {
         String normalized = keyword == null || keyword.isBlank() ? null : keyword.trim();
         return userMapper.searchActive(normalized);
+    }
+
+    public PageResult<User> searchActive(String keyword, PageQuery query) {
+        String normalized = keyword == null || keyword.isBlank() ? null : keyword.trim();
+        long total = userMapper.countActive(normalized);
+        List<User> items = userMapper.findActivePage(
+                normalized,
+                query.offset(),
+                query.getPageSize()
+        );
+        return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
     }
 
     public boolean emailExists(String email, Long excludedUserId) {
@@ -64,6 +85,13 @@ public class UserService {
     @Transactional
     public void updateProfile(User user) {
         if (userMapper.updateProfile(user) != 1) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
+        }
+    }
+
+    @Transactional
+    public void clearAvatarUrl(Long userId) {
+        if (userMapper.clearAvatarUrl(userId) != 1) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
         }
     }

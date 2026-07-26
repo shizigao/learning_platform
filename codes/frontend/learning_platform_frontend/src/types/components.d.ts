@@ -12,11 +12,16 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AppLogo: typeof import('./../components/AppLogo.vue')['default']
+    CategoryPickerDialog: typeof import('./../components/CategoryPickerDialog.vue')['default']
+    ClassPickerDialog: typeof import('./../components/ClassPickerDialog.vue')['default']
     ContentCard: typeof import('./../components/ContentCard.vue')['default']
+    ContentReferencePickerDialog: typeof import('./../components/ContentReferencePickerDialog.vue')['default']
     ContentStatusTag: typeof import('./../components/ContentStatusTag.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElAvatar: typeof import('element-plus/es')['ElAvatar']
     ElButton: typeof import('element-plus/es')['ElButton']
+    ElButtonGroup: typeof import('element-plus/es')['ElButtonGroup']
+    ElCard: typeof import('element-plus/es')['ElCard']
     ElCheckbox: typeof import('element-plus/es')['ElCheckbox']
     ElCheckboxGroup: typeof import('element-plus/es')['ElCheckboxGroup']
     ElConfigProvider: typeof import('element-plus/es')['ElConfigProvider']
@@ -48,11 +53,14 @@ declare module 'vue' {
     ElTabPane: typeof import('element-plus/es')['ElTabPane']
     ElTabs: typeof import('element-plus/es')['ElTabs']
     ElTag: typeof import('element-plus/es')['ElTag']
+    MarkdownEditor: typeof import('./../components/MarkdownEditor.vue')['default']
+    MarkdownRenderer: typeof import('./../components/MarkdownRenderer.vue')['default']
     PublisherExamNav: typeof import('./../components/PublisherExamNav.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SectionPageHeader: typeof import('./../components/SectionPageHeader.vue')['default']
     ThumbUpIcon: typeof import('./../components/ThumbUpIcon.vue')['default']
+    UserSearchPanel: typeof import('./../components/UserSearchPanel.vue')['default']
   }
   export interface GlobalDirectives {
     vLoading: typeof import('element-plus/es')['ElLoadingDirective']

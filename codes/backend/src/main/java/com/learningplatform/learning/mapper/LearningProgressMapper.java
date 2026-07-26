@@ -53,11 +53,11 @@ public interface LearningProgressMapper {
     @Update("""
             UPDATE learning_progress
             SET last_learned_at = #{learnedAt},
-                progress_percent = GREATEST(progress_percent, #{progressPercent}),
+                progress_percent = #{progressPercent},
                 last_position = #{lastPosition},
                 completed_at = CASE
                     WHEN #{progressPercent} >= 100 THEN COALESCE(completed_at, #{learnedAt})
-                    ELSE completed_at
+                    ELSE NULL
                 END
             WHERE user_id = #{userId} AND content_id = #{contentId}
             """)

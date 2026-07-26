@@ -111,7 +111,10 @@ public interface UserEntitlementMapper {
             WHERE id = #{id}
               AND user_id = #{userId}
               AND entitlement_type = #{entitlementType}
-              AND entitlement_type IN ('AI_QUOTA', 'EXAM_QUOTA')
+              AND entitlement_type IN (
+                  'AI_QUOTA', 'EXAM_QUOTA',
+                  'EXAM_OVERALL_AI_QUOTA', 'EXAM_PERSONAL_AI_QUOTA'
+              )
               AND status IN ('ACTIVE', 'EXHAUSTED')
               AND effective_at <= CURRENT_TIMESTAMP
               AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)

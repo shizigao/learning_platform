@@ -10,6 +10,9 @@ spring:
       port: 6379
 
 app:
+  offline-teaching:
+    security:
+      encryption-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
   exam:
     runtime-cache-enabled: false
     timeout-scan-ms: 3600000

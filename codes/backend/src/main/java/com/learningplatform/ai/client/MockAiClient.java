@@ -3,6 +3,8 @@ package com.learningplatform.ai.client;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MockAiClient implements AiClient {
     private static final String PROVIDER = "mock";
@@ -77,6 +79,24 @@ public class MockAiClient implements AiClient {
         } else if (systemInstruction.contains("TASK:CONTENT_EXPLANATION")) {
             content = "【模拟 AI 讲解】针对“" + preview
                     + "”，请结合资料中的定义、步骤和示例逐项理解。";
+        } else if (systemInstruction.contains("TASK:OFFLINE_TEACHER_RECOMMENDATION")) {
+            Matcher teacherMatcher = Pattern.compile(
+                    "\\\"teacherId\\\"\\s*:\\s*(\\d+)"
+            ).matcher(lastUserMessage.content());
+            String teacherId = teacherMatcher.find()
+                    ? teacherMatcher.group(1)
+                    : "1";
+            content = """
+                    {
+                      "recommendations": [
+                        {
+                          "teacherId": %s,
+                          "reason": "该教师的教学方向与学习目标较为匹配",
+                          "matchHighlights": ["教授内容匹配", "可结合实际情况进一步沟通"]
+                        }
+                      ]
+                    }
+                    """.formatted(teacherId);
         } else {
             content = "【模拟 AI】已处理请求：" + preview;
         }

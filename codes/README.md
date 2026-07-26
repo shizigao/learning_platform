@@ -9,9 +9,10 @@
 ## 1. 主要功能
 
 - 用户注册、登录、个人资料和基于 JWT 的角色权限；
+- 班级创建、邀请码加入、成员分级管理、公告与班级资源聚合；
 - 学习资料创建、文件上传、审核、发布、下架、检索和付费访问；
 - 学习进度、点赞、收藏、评论和“我的学习”；
-- 题库、固定试卷、考试发布、指定考生、自动交卷、客观题判分和人工阅卷；
+- 题库、试卷、考试发布、指定考生/班级、自动交卷、客观题判分和人工阅卷；
 - 商品、模拟订单、模拟支付及资料、AI 次数、考试发布次数三类权益；
 - 资料总结、知识点、复习提纲、AI 讲解会话和额度记录；
 - 用户、资料、考试、订单、AI 配置及操作日志管理；
@@ -214,7 +215,7 @@ SOURCE E:/你的项目路径/codes/database/001_schema.sql;
 SOURCE E:/你的项目路径/codes/database/002_seed_data.sql;
 ```
 
-路径使用 `/`。初始化后应有 33 张业务表，并包含 `USER`、`PUBLISHER`、`ADMIN`
+路径使用 `/`。初始化后应有 38 张业务表，并包含 `USER`、`PUBLISHER`、`ADMIN`
 三个角色。更详细的检查 SQL 见 [database/README.md](database/README.md)。
 
 ### 5.3 配置后端环境变量
@@ -419,4 +420,3 @@ Get-NetTCPConnection -LocalPort 5173,8080,3306,6379,9000,9001 `
 - [AI 学习接口](backend/docs/ai-learning-api.md)
 - [安全与审计](backend/docs/security-and-audit.md)
 - [已知非阻断限制](backend/docs/known-issues.md)
-

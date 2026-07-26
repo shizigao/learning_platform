@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import com.learningplatform.exam.domain.ExamAssignmentMode;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -23,6 +24,11 @@ public record ExamWriteRequest(
 
         @Size(max = 5000, message = "考试说明不能超过5000个字符")
         String instructions,
+
+        ExamAssignmentMode assignmentMode,
+
+        @Size(max = 50, message = "单场考试最多发放到50个班级")
+        List<@NotNull(message = "班级ID不能为空") @Min(value = 1, message = "班级ID必须为正数") Long> classIds,
 
         @NotNull(message = "考试开始时间不能为空")
         LocalDateTime startAt,

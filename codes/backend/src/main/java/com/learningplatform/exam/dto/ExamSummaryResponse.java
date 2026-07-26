@@ -2,6 +2,7 @@ package com.learningplatform.exam.dto;
 
 import com.learningplatform.exam.domain.Exam;
 import com.learningplatform.exam.domain.ExamStatus;
+import com.learningplatform.exam.domain.ExamAssignmentMode;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -11,6 +12,7 @@ public record ExamSummaryResponse(
         Long publisherId,
         Long paperId,
         String name,
+        ExamAssignmentMode assignmentMode,
         LocalDateTime startAt,
         LocalDateTime endAt,
         int durationMinutes,
@@ -28,6 +30,7 @@ public record ExamSummaryResponse(
                 exam.getPublisherId(),
                 exam.getPaperId(),
                 exam.getName(),
+                exam.getAssignmentMode(),
                 exam.getStartAt(),
                 exam.getEndAt(),
                 exam.getDurationMinutes(),

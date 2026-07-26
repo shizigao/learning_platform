@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Collection, DataBoard, Document, VideoCamera } from '@element-plus/icons-vue'
-import { computed } from 'vue'
+import { Reading } from '@element-plus/icons-vue'
+import { ref, watch } from 'vue'
 
 import type { ContentSummary } from '@/types/content'
 
@@ -9,36 +9,40 @@ const props = defineProps<{
   categoryName?: string
 }>()
 
-const icon = computed(() => {
-  if (props.content.contentType === 'VIDEO') return VideoCamera
-  if (props.content.contentType === 'ARTICLE') return Document
-  if (props.content.contentType === 'MIXED') return DataBoard
-  return Collection
-})
+const coverFailed = ref(false)
 
-const typeLabel = computed(
-  () =>
-    ({
-      ARTICLE: '图文',
-      DOCUMENT: '文档',
-      VIDEO: '视频',
-      ATTACHMENT: '附件',
-      MIXED: '综合',
-    })[props.content.contentType],
+watch(
+  () => props.content.coverUrl,
+  () => {
+    coverFailed.value = false
+  },
 )
 </script>
 
 <template>
   <RouterLink :to="`/contents/${content.id}`" class="content-card">
     <div class="cover">
-      <el-icon><component :is="icon" /></el-icon>
-      <span>{{ typeLabel }}</span>
+      <img
+        v-if="content.coverUrl && !coverFailed"
+        :src="content.coverUrl"
+        :alt="`${content.title}封面`"
+        loading="lazy"
+        @error="coverFailed = true"
+      />
+      <template v-else>
+        <el-icon><Reading /></el-icon>
+        <span>学习资料</span>
+      </template>
     </div>
     <div class="card-body">
       <div class="meta">
-        <span>{{ categoryName || '学习资料' }}</span>
-        <el-tag :type="content.isFree ? 'success' : 'warning'" size="small" effect="light">
-          {{ content.isFree ? '免费' : `¥${Number(content.price).toFixed(2)}` }}
+        <span>{{ categoryName || content.categoryName || '学习资料' }}</span>
+        <el-tag
+          :type="content.distributionMode === 'CLASS' ? 'primary' : content.isFree ? 'success' : 'warning'"
+          size="small"
+          effect="light"
+        >
+          {{ content.distributionMode === 'CLASS' ? '班级资料' : content.isFree ? '免费' : `¥${Number(content.price).toFixed(2)}` }}
         </el-tag>
       </div>
       <h3>{{ content.title }}</h3>
@@ -57,6 +61,7 @@ const typeLabel = computed(
 .content-card { display: flex; overflow: hidden; min-width: 0; border: 1px solid var(--lp-border); border-radius: 18px; flex-direction: column; background: #fff; box-shadow: 0 8px 26px rgb(16 24 40 / 5%); transition: 180ms ease; }
 .content-card:hover { border-color: #bfd3ff; box-shadow: 0 18px 42px rgb(37 99 235 / 12%); transform: translateY(-3px); }
 .cover { display: flex; height: 142px; align-items: center; justify-content: center; flex-direction: column; gap: 10px; color: #2563eb; background: linear-gradient(135deg, #eff6ff, #eef2ff); }
+.cover img { width: 100%; height: 100%; object-fit: cover; }
 .cover .el-icon { font-size: 34px; }
 .cover span { font-size: 12px; font-weight: 700; letter-spacing: .12em; }
 .card-body { display: flex; min-height: 190px; flex-direction: column; padding: 18px; }

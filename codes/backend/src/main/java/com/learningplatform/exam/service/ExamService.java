@@ -3,7 +3,11 @@ package com.learningplatform.exam.service;
 import com.learningplatform.common.api.ErrorCode;
 import com.learningplatform.common.exception.BusinessException;
 import com.learningplatform.common.page.PageResult;
+import com.learningplatform.common.page.PageQuery;
+import com.learningplatform.classroom.mapper.ClassScopeMapper;
+import com.learningplatform.classroom.service.ClassroomService;
 import com.learningplatform.exam.domain.Exam;
+import com.learningplatform.exam.domain.ExamAssignmentMode;
 import com.learningplatform.exam.domain.ExamCandidate;
 import com.learningplatform.exam.domain.ExamPaper;
 import com.learningplatform.exam.domain.ExamStatus;
@@ -35,19 +39,25 @@ public class ExamService {
     private final ExamPaperService paperService;
     private final ExamPublishQuotaService quotaService;
     private final UserService userService;
+    private final ClassScopeMapper classScopeMapper;
+    private final ClassroomService classroomService;
 
     public ExamService(
             ExamMapper examMapper,
             ExamCandidateMapper candidateMapper,
             ExamPaperService paperService,
             ExamPublishQuotaService quotaService,
-            UserService userService
+            UserService userService,
+            ClassScopeMapper classScopeMapper,
+            ClassroomService classroomService
     ) {
         this.examMapper = examMapper;
         this.candidateMapper = candidateMapper;
         this.paperService = paperService;
         this.quotaService = quotaService;
         this.userService = userService;
+        this.classScopeMapper = classScopeMapper;
+        this.classroomService = classroomService;
     }
 
     public PageResult<ExamSummaryResponse> list(Long publisherId, ExamListQuery query) {
@@ -73,7 +83,11 @@ public class ExamService {
     ) {
         ExamPaper paper = paperService.getReadyOwned(request.paperId(), publisherId, publisherAdmin);
         validateSchedule(request, paper);
-        List<Long> candidateIds = validateCandidates(request.candidateUserIds());
+        ExamAssignmentMode assignmentMode = assignmentMode(request);
+        validateAssignment(request, publisherId, assignmentMode);
+        List<Long> candidateIds = assignmentMode == ExamAssignmentMode.INDIVIDUAL
+                ? validateCandidates(request.candidateUserIds())
+                : List.of();
 
         Exam exam = new Exam();
         exam.setPublisherId(publisherId);
@@ -81,6 +95,7 @@ public class ExamService {
         if (examMapper.insert(exam) != 1) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "创建考试失败");
         }
+        replaceClassScopes(exam.getId(), request.classIds(), assignmentMode);
         replaceCandidates(exam.getId(), candidateIds);
         return detail(exam.getId(), publisherId, publisherAdmin);
     }
@@ -97,12 +112,17 @@ public class ExamService {
         assertDraft(exam);
         ExamPaper paper = paperService.getReadyOwned(request.paperId(), requesterId, requesterAdmin);
         validateSchedule(request, paper);
-        List<Long> candidateIds = validateCandidates(request.candidateUserIds());
+        ExamAssignmentMode assignmentMode = assignmentMode(request);
+        validateAssignment(request, requesterId, assignmentMode);
+        List<Long> candidateIds = assignmentMode == ExamAssignmentMode.INDIVIDUAL
+                ? validateCandidates(request.candidateUserIds())
+                : List.of();
 
         apply(exam, request);
         if (examMapper.updateDraft(exam) != 1) {
             throw invalidState("只有草稿考试可以修改");
         }
+        replaceClassScopes(examId, request.classIds(), assignmentMode);
         replaceCandidates(examId, candidateIds);
         return detail(examId, requesterId, requesterAdmin);
     }
@@ -122,7 +142,8 @@ public class ExamService {
                 ExamSummaryResponse.from(exam),
                 exam.getInstructions(),
                 ExamPaperSummaryResponse.from(paper),
-                candidates
+                candidates,
+                classScopeMapper.findExamClassIds(examId)
         );
     }
 
@@ -145,6 +166,9 @@ public class ExamService {
                 requesterAdmin
         );
         validatePublishTime(exam);
+        if (exam.getAssignmentMode() == ExamAssignmentMode.CLASS) {
+            syncClassCandidates(examId);
+        }
         if (candidateMapper.findByExamId(examId).isEmpty()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "考试至少需要指定一名考生");
         }
@@ -191,11 +215,26 @@ public class ExamService {
                 .toList();
     }
 
+    public PageResult<ExamSummaryResponse> listForClass(
+            Long classId,
+            Long requesterId,
+            PageQuery query
+    ) {
+        classroomService.requireActiveMember(classId, requesterId);
+        long total = classScopeMapper.countClassExams(classId);
+        List<ExamSummaryResponse> items = classScopeMapper.findClassExams(
+                        classId,
+                        query.offset(),
+                        query.getPageSize()
+                ).stream()
+                .map(ExamSummaryResponse::from)
+                .toList();
+        return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
+    }
+
     public CandidateExamResponse candidateDetail(Long examId, Long userId) {
         Exam exam = getRequired(examId);
-        if (!candidateMapper.exists(examId, userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "你不是本场考试的指定考生");
-        }
+        ensureCandidateAccess(exam, userId);
         if (exam.getStatus() != ExamStatus.PUBLISHED
                 && exam.getStatus() != ExamStatus.ONGOING
                 && exam.getStatus() != ExamStatus.FINISHED) {
@@ -226,6 +265,7 @@ public class ExamService {
         exam.setPaperId(request.paperId());
         exam.setName(request.name().trim());
         exam.setInstructions(normalize(request.instructions()));
+        exam.setAssignmentMode(assignmentMode(request));
         exam.setStartAt(request.startAt());
         exam.setEndAt(request.endAt());
         exam.setDurationMinutes(request.durationMinutes());
@@ -279,6 +319,71 @@ public class ExamService {
                 throw new BusinessException(ErrorCode.INTERNAL_ERROR, "保存指定考生失败");
             }
         }
+    }
+
+    @Transactional
+    public ExamCandidate ensureCandidateAccess(Exam exam, Long userId) {
+        if (exam.getAssignmentMode() == ExamAssignmentMode.CLASS) {
+            if (!classScopeMapper.hasExamAccess(exam.getId(), userId)) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "仅考试指定班级的有效成员可以进入");
+            }
+            if (!candidateMapper.exists(exam.getId(), userId)) {
+                insertCandidate(exam.getId(), userId);
+            }
+        } else if (!candidateMapper.exists(exam.getId(), userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "你不是本场考试的指定考生");
+        }
+        return candidateMapper.findOne(exam.getId(), userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "你不是本场考试的指定考生"));
+    }
+
+    private void validateAssignment(
+            ExamWriteRequest request,
+            Long publisherId,
+            ExamAssignmentMode mode
+    ) {
+        if (mode == ExamAssignmentMode.CLASS) {
+            classroomService.requireManageableClasses(request.classIds(), publisherId);
+        }
+    }
+
+    private void replaceClassScopes(
+            Long examId,
+            List<Long> classIds,
+            ExamAssignmentMode mode
+    ) {
+        classScopeMapper.deleteExamScopes(examId);
+        if (mode != ExamAssignmentMode.CLASS) return;
+        classIds.forEach(classId -> {
+            if (classScopeMapper.insertExamScope(examId, classId) != 1) {
+                throw new BusinessException(ErrorCode.INTERNAL_ERROR, "保存考试班级范围失败");
+            }
+        });
+    }
+
+    private void syncClassCandidates(Long examId) {
+        List<Long> userIds = classScopeMapper.findActiveMemberIdsForExam(examId);
+        if (userIds.isEmpty()) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "指定班级中暂无有效成员");
+        }
+        userIds.forEach(userId -> {
+            if (!candidateMapper.exists(examId, userId)) insertCandidate(examId, userId);
+        });
+    }
+
+    private void insertCandidate(Long examId, Long userId) {
+        ExamCandidate candidate = new ExamCandidate();
+        candidate.setExamId(examId);
+        candidate.setUserId(userId);
+        if (candidateMapper.insert(candidate) != 1) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "保存考试考生失败");
+        }
+    }
+
+    private ExamAssignmentMode assignmentMode(ExamWriteRequest request) {
+        return request.assignmentMode() == null
+                ? ExamAssignmentMode.INDIVIDUAL
+                : request.assignmentMode();
     }
 
     private void validatePublishTime(Exam exam) {

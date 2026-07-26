@@ -8,15 +8,17 @@ import {
   createContent,
   deleteContentFile,
   getPublisherContent,
-  listCategories,
   updateContent,
   uploadContentFile,
 } from '@/api/content'
+import CategoryPickerDialog from '@/components/CategoryPickerDialog.vue'
+import ClassPickerDialog from '@/components/ClassPickerDialog.vue'
 import ContentStatusTag from '@/components/ContentStatusTag.vue'
+import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import SectionPageHeader from '@/components/SectionPageHeader.vue'
 import type {
-  ContentCategory,
   ContentDetail,
+  ContentFile,
   ContentFileRole,
   ContentWritePayload,
 } from '@/types/content'
@@ -33,8 +35,8 @@ const saving = ref(false)
 const loading = ref(false)
 const loadError = ref('')
 const uploading = ref(false)
-const categories = ref<ContentCategory[]>([])
 const detail = ref<ContentDetail>()
+const markdownEditor = ref<InstanceType<typeof MarkdownEditor>>()
 const selectedFile = ref<File>()
 const fileInput = ref<HTMLInputElement>()
 const fileRole = ref<ContentFileRole>('CONTENT')
@@ -43,8 +45,9 @@ const form = reactive<ContentWritePayload>({
   categoryId: 0,
   title: '',
   summary: '',
-  contentType: 'ARTICLE',
   articleBody: '',
+  distributionMode: 'PUBLIC',
+  classIds: [],
   isFree: true,
   price: 0,
 })
@@ -52,6 +55,7 @@ const formErrors = reactive({
   categoryId: '',
   title: '',
   price: '',
+  classIds: '',
 })
 const editable = computed(() => !detail.value || ['DRAFT', 'REJECTED'].includes(detail.value.status))
 
@@ -60,8 +64,9 @@ function fill(content: ContentDetail): void {
   form.categoryId = content.categoryId
   form.title = content.title
   form.summary = content.summary ?? ''
-  form.contentType = content.contentType
   form.articleBody = content.articleBody ?? ''
+  form.distributionMode = content.distributionMode ?? 'PUBLIC'
+  form.classIds = [...(content.classIds ?? [])]
   form.isFree = content.isFree
   form.price = Number(content.price)
 }
@@ -70,14 +75,33 @@ async function load(): Promise<void> {
   loading.value = true
   loadError.value = ''
   try {
-    categories.value = await listCategories()
     if (contentId.value) fill(await getPublisherContent(contentId.value))
-    else if (categories.value.length) form.categoryId = categories.value[0]!.id
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : '资料加载失败'
   } finally {
     loading.value = false
   }
+}
+
+async function refreshFiles(): Promise<void> {
+  if (!contentId.value) return
+  detail.value = await getPublisherContent(contentId.value)
+}
+
+function updateCategory(categoryId?: number): void {
+  form.categoryId = categoryId ?? 0
+}
+
+function insertImage(file: ContentFile): void {
+  markdownEditor.value?.insertImage(file)
+}
+
+function insertFileReference(file: ContentFile): void {
+  markdownEditor.value?.insertFileReference(file)
+}
+
+function fileRoleLabel(role: ContentFileRole): string {
+  return UPLOAD_RULES[role].label
 }
 
 function validateForm(): boolean {
@@ -86,7 +110,10 @@ function validateForm(): boolean {
   formErrors.price = !form.isFree && Number(form.price) < 0.01
     ? '付费资料价格必须不少于 0.01 元'
     : ''
-  return !formErrors.categoryId && !formErrors.title && !formErrors.price
+  formErrors.classIds = form.distributionMode === 'CLASS' && form.classIds.length === 0
+    ? '请选择至少一个发放班级'
+    : ''
+  return !formErrors.categoryId && !formErrors.title && !formErrors.price && !formErrors.classIds
 }
 
 async function save(): Promise<void> {
@@ -96,7 +123,14 @@ async function save(): Promise<void> {
   }
   saving.value = true
   try {
-    const payload = { ...form, title: form.title.trim(), summary: form.summary.trim(), articleBody: form.articleBody.trim(), price: form.isFree ? 0 : Number(form.price) }
+    const payload = {
+      ...form,
+      title: form.title.trim(),
+      summary: form.summary.trim(),
+      articleBody: form.articleBody.trim(),
+      isFree: form.distributionMode === 'CLASS' ? true : form.isFree,
+      price: form.distributionMode === 'CLASS' || form.isFree ? 0 : Number(form.price),
+    }
     const saved = contentId.value
       ? await updateContent(contentId.value, payload)
       : await createContent(payload)
@@ -145,7 +179,7 @@ async function upload(): Promise<void> {
   uploading.value = true
   try {
     await uploadContentFile(contentId.value, fileRole.value, selectedFile.value)
-    fill(await getPublisherContent(contentId.value))
+    await refreshFiles()
     clearSelectedFile()
     ElMessage.success('文件上传成功')
   } catch (error) {
@@ -157,16 +191,47 @@ async function upload(): Promise<void> {
 
 async function removeFile(fileId: number): Promise<void> {
   if (!contentId.value) return
+  if (
+    form.articleBody.includes(`content-image://${fileId}`)
+    || form.articleBody.includes(`content-file://${fileId}`)
+  ) {
+    ElMessage.warning('该文件仍被正文引用，请先从正文中移除对应图片或文件链接')
+    return
+  }
   try {
     await ElMessageBox.confirm('确定删除这个文件吗？', '删除文件', { type: 'warning' })
     await deleteContentFile(contentId.value, fileId)
-    fill(await getPublisherContent(contentId.value))
+    await refreshFiles()
   } catch (error) {
     if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '删除失败')
   }
 }
 
 watch(fileRole, clearSelectedFile)
+watch(
+  () => form.title,
+  (title) => {
+    if (title.trim()) formErrors.title = ''
+  },
+)
+watch(
+  () => form.categoryId,
+  (categoryId) => {
+    if (categoryId > 0) formErrors.categoryId = ''
+  },
+)
+watch(
+  () => [form.isFree, form.price] as const,
+  ([isFree, price]) => {
+    if (isFree || Number(price) >= 0.01) formErrors.price = ''
+  },
+)
+watch(
+  () => [form.distributionMode, form.classIds.length] as const,
+  ([mode, count]) => {
+    if (mode !== 'CLASS' || count > 0) formErrors.classIds = ''
+  },
+)
 onMounted(load)
 </script>
 
@@ -193,14 +258,53 @@ onMounted(load)
       <el-form class="form-card" label-position="top" :disabled="!editable">
         <div class="form-grid">
           <el-form-item label="资料标题" required :error="formErrors.title"><el-input v-model="form.title" maxlength="200" show-word-limit /></el-form-item>
-          <el-form-item label="资料分类" required :error="formErrors.categoryId"><el-select v-model="form.categoryId"><el-option v-for="item in categories" :key="item.id" :label="item.name" :value="item.id" /></el-select></el-form-item>
-          <el-form-item label="资料类型" required><el-select v-model="form.contentType"><el-option label="图文" value="ARTICLE" /><el-option label="文档" value="DOCUMENT" /><el-option label="视频" value="VIDEO" /><el-option label="附件" value="ATTACHMENT" /><el-option label="综合" value="MIXED" /></el-select></el-form-item>
-          <el-form-item label="收费方式"><el-radio-group v-model="form.isFree"><el-radio-button :value="true">免费</el-radio-button><el-radio-button :value="false">付费</el-radio-button></el-radio-group></el-form-item>
-          <el-form-item v-if="!form.isFree" label="价格（元）" :error="formErrors.price"><el-input-number v-model="form.price" :min="0.01" :precision="2" /></el-form-item>
+          <el-form-item label="资料分类" required :error="formErrors.categoryId">
+            <CategoryPickerDialog
+              :model-value="form.categoryId || undefined"
+              :disabled="!editable"
+              @update:model-value="updateCategory"
+            />
+          </el-form-item>
+          <el-form-item label="发放方式">
+            <el-radio-group v-model="form.distributionMode">
+              <el-radio-button value="PUBLIC">公开发放</el-radio-button>
+              <el-radio-button value="CLASS">班级发放</el-radio-button>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item
+            v-if="form.distributionMode === 'PUBLIC'"
+            label="公开收费方式"
+          >
+            <el-radio-group v-model="form.isFree">
+              <el-radio-button :value="true">免费</el-radio-button>
+              <el-radio-button :value="false">付费</el-radio-button>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item
+            v-if="form.distributionMode === 'PUBLIC' && !form.isFree"
+            label="价格（元）"
+            :error="formErrors.price"
+          >
+            <el-input-number v-model="form.price" :min="0.01" :precision="2" />
+          </el-form-item>
+          <el-form-item
+            v-if="form.distributionMode === 'CLASS'"
+            label="发放班级"
+            required
+            :error="formErrors.classIds"
+          >
+            <ClassPickerDialog v-model="form.classIds" :disabled="!editable" />
+          </el-form-item>
         </div>
-        <el-alert v-if="!loading && categories.length === 0" title="暂无可用分类，请联系管理员先创建分类" type="warning" show-icon :closable="false" />
         <el-form-item label="资料简介"><el-input v-model="form.summary" maxlength="1000" :rows="3" show-word-limit type="textarea" /></el-form-item>
-        <el-form-item label="图文正文"><el-input v-model="form.articleBody" :rows="12" type="textarea" placeholder="图文资料需填写正文；文档和视频资料可使用文件上传" /></el-form-item>
+        <el-form-item label="资料正文（Markdown）">
+          <MarkdownEditor
+            ref="markdownEditor"
+            v-model="form.articleBody"
+            :content-id="contentId"
+            :disabled="!editable"
+          />
+        </el-form-item>
       </el-form>
       <aside class="upload-card">
         <h2><el-icon><UploadFilled /></el-icon>文件管理</h2>
@@ -220,7 +324,33 @@ onMounted(load)
         <label class="file-picker" :class="{ disabled: !editable }"><input ref="fileInput" type="file" :accept="currentUploadRule.accept" :disabled="!editable" @change="chooseFile" /><span>{{ selectedFile?.name || '选择本地文件' }}</span></label>
         <el-button type="primary" :loading="uploading" :disabled="!editable || !selectedFile || !contentId" @click="upload">上传文件</el-button>
         <div class="file-list">
-          <div v-for="file in detail?.files ?? []" :key="file.id" class="file-item"><div><strong>{{ file.originalName }}</strong><small>{{ file.fileRole }} · {{ (file.sizeBytes / 1024 / 1024).toFixed(2) }} MB</small></div><el-button text type="danger" :icon="Delete" :disabled="!editable" @click="removeFile(file.id)" /></div>
+          <div v-for="file in detail?.files ?? []" :key="file.id" class="file-item">
+            <div class="file-summary">
+              <strong>{{ file.originalName }}</strong>
+              <small>{{ fileRoleLabel(file.fileRole) }} · {{ (file.sizeBytes / 1024 / 1024).toFixed(2) }} MB</small>
+            </div>
+            <div class="file-actions">
+              <el-button
+                v-if="file.fileRole === 'INLINE_IMAGE'"
+                text
+                type="primary"
+                :disabled="!editable"
+                @click="insertImage(file)"
+              >
+                插入图片
+              </el-button>
+              <el-button
+                v-else-if="!['COVER'].includes(file.fileRole)"
+                text
+                type="primary"
+                :disabled="!editable"
+                @click="insertFileReference(file)"
+              >
+                插入引用
+              </el-button>
+              <el-button text type="danger" :icon="Delete" :disabled="!editable" @click="removeFile(file.id)" />
+            </div>
+          </div>
           <el-empty v-if="!loading && (detail?.files.length ?? 0) === 0" :image-size="54" description="暂无文件" />
         </div>
       </aside>
@@ -229,6 +359,6 @@ onMounted(load)
 </template>
 
 <style scoped>
-.editor-page { min-height: calc(100vh - 145px); padding: 48px 0 76px; background: #f6f8fc; }.load-alert, .reject-alert { margin-bottom: 20px; }.editor-layout { display: grid; align-items: start; gap: 22px; grid-template-columns: minmax(0, 1fr) 360px; }.form-card, .upload-card { border: 1px solid var(--lp-border); border-radius: 18px; background: #fff; box-shadow: var(--lp-shadow); padding: 28px; }.form-grid { display: grid; gap: 0 18px; grid-template-columns: repeat(2, 1fr); }.form-grid .el-select { width: 100%; }.upload-card { position: sticky; top: 94px; }.upload-card h2 { display: flex; align-items: center; gap: 8px; margin-top: 0; font-size: 18px; }.upload-card > p { color: var(--lp-text-secondary); font-size: 13px; line-height: 1.7; }.upload-card > .el-select, .upload-card > .el-button { width: 100%; margin-top: 12px; }.upload-rule { display: flex; border: 1px solid #cfe0ff; border-radius: 10px; margin-top: 12px; flex-direction: column; gap: 5px; color: #475467; background: #f5f8ff; font-size: 12px; line-height: 1.5; padding: 11px 12px; }.upload-rule strong { color: #2457c5; font-size: 13px; }.file-picker { display: block; overflow: hidden; border: 1px dashed #b8c5dc; border-radius: 10px; margin-top: 12px; color: var(--lp-primary); background: #f8faff; cursor: pointer; padding: 14px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }.file-picker input { display: none; }.file-picker.disabled { cursor: not-allowed; opacity: .55; }.file-list { margin-top: 20px; }.file-list .el-empty { padding: 18px 0 4px; }.file-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--lp-border); padding: 13px 0; }.file-item strong { display: block; overflow: hidden; max-width: 205px; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }.file-item small { display: block; margin-top: 5px; color: #98a2b3; font-size: 11px; }
+.editor-page { min-height: calc(100vh - 145px); padding: 48px 0 76px; background: #f6f8fc; }.load-alert, .reject-alert { margin-bottom: 20px; }.editor-layout { display: grid; align-items: start; gap: 22px; grid-template-columns: minmax(0, 1fr) 390px; }.form-card, .upload-card { border: 1px solid var(--lp-border); border-radius: 18px; background: #fff; box-shadow: var(--lp-shadow); padding: 28px; }.form-grid { display: grid; gap: 0 18px; grid-template-columns: repeat(2, 1fr); }.form-grid .el-select { width: 100%; }.upload-card { position: sticky; top: 94px; }.upload-card h2 { display: flex; align-items: center; gap: 8px; margin-top: 0; font-size: 18px; }.upload-card > p { color: var(--lp-text-secondary); font-size: 13px; line-height: 1.7; }.upload-card > .el-select, .upload-card > .el-button { width: 100%; margin-top: 12px; }.upload-rule { display: flex; border: 1px solid #cfe0ff; border-radius: 10px; margin-top: 12px; flex-direction: column; gap: 5px; color: #475467; background: #f5f8ff; font-size: 12px; line-height: 1.5; padding: 11px 12px; }.upload-rule strong { color: #2457c5; font-size: 13px; }.file-picker { display: block; overflow: hidden; border: 1px dashed #b8c5dc; border-radius: 10px; margin-top: 12px; color: var(--lp-primary); background: #f8faff; cursor: pointer; padding: 14px; text-align: center; text-overflow: ellipsis; white-space: nowrap; }.file-picker input { display: none; }.file-picker.disabled { cursor: not-allowed; opacity: .55; }.file-list { margin-top: 20px; }.file-list .el-empty { padding: 18px 0 4px; }.file-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--lp-border); padding: 13px 0; }.file-summary { min-width: 0; }.file-item strong { display: block; overflow: hidden; max-width: 185px; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }.file-item small { display: block; margin-top: 5px; color: #98a2b3; font-size: 11px; }.file-actions { display: flex; flex: none; align-items: center; gap: 0; }.file-actions .el-button { margin-left: 0; padding-inline: 6px; }
 @media (max-width: 850px) { .editor-layout { grid-template-columns: 1fr; }.upload-card { position: static; } }@media (max-width: 560px) { .form-grid { grid-template-columns: 1fr; }.form-card, .upload-card { padding: 20px 16px; } }
 </style>

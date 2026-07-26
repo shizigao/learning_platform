@@ -32,7 +32,12 @@ const entitlementsLoading = ref(false)
 const products = ref<Product[]>([])
 const orders = ref<Order[]>([])
 const entitlements = ref<Entitlement[]>([])
-const balances = ref<EntitlementBalances>({ aiQuota: 0, examQuota: 0 })
+const balances = ref<EntitlementBalances>({
+  aiQuota: 0,
+  examQuota: 0,
+  examOverallAiQuota: 0,
+  examPersonalAiQuota: 0,
+})
 const orderTotal = ref(0)
 const creatingId = ref<number>()
 const payingId = ref<number>()
@@ -41,7 +46,9 @@ const quantities = reactive<Record<number, number>>({})
 const productType = ref<ProductType | undefined>(
   route.query.type === 'CONTENT' ||
     route.query.type === 'AI_PACKAGE' ||
-    route.query.type === 'EXAM_PACKAGE'
+    route.query.type === 'EXAM_PACKAGE' ||
+    route.query.type === 'EXAM_OVERALL_AI_PACKAGE' ||
+    route.query.type === 'EXAM_PERSONAL_AI_PACKAGE'
     ? route.query.type
     : undefined,
 )
@@ -74,6 +81,8 @@ const productTypeLabels: Record<ProductType, string> = {
   CONTENT: '付费资料',
   AI_PACKAGE: 'AI 次数包',
   EXAM_PACKAGE: '考试发布次数包',
+  EXAM_OVERALL_AI_PACKAGE: '考试整体 AI 分析次数包',
+  EXAM_PERSONAL_AI_PACKAGE: '考试个人 AI 分析次数包',
 }
 const orderStatusLabels: Record<OrderStatus, string> = {
   PENDING_PAYMENT: '待模拟支付',
@@ -86,6 +95,8 @@ const entitlementTypeLabels: Record<EntitlementType, string> = {
   CONTENT_ACCESS: '资料访问权',
   AI_QUOTA: 'AI 使用次数',
   EXAM_QUOTA: '考试发布次数',
+  EXAM_OVERALL_AI_QUOTA: '考试整体 AI 分析次数',
+  EXAM_PERSONAL_AI_QUOTA: '考试个人 AI 分析次数',
 }
 const entitlementStatusLabels: Record<EntitlementStatus, string> = {
   ACTIVE: '可用',
@@ -263,6 +274,12 @@ onMounted(() => Promise.all([loadProducts(), loadOrders(), loadEntitlements()]))
                 <el-radio-button value="CONTENT">付费资料</el-radio-button>
                 <el-radio-button value="AI_PACKAGE">AI 次数包</el-radio-button>
                 <el-radio-button value="EXAM_PACKAGE">考试次数包</el-radio-button>
+                <el-radio-button value="EXAM_OVERALL_AI_PACKAGE">
+                  考试整体分析
+                </el-radio-button>
+                <el-radio-button value="EXAM_PERSONAL_AI_PACKAGE">
+                  考试个人分析
+                </el-radio-button>
               </el-radio-group>
             </div>
             <div v-loading="productsLoading" class="product-grid">
@@ -379,6 +396,14 @@ onMounted(() => Promise.all([loadProducts(), loadOrders(), loadEntitlements()]))
               <div class="balance-grid">
                 <article><span>AI 可用次数</span><strong>{{ balances.aiQuota }}</strong></article>
                 <article><span>考试发布可用次数</span><strong>{{ balances.examQuota }}</strong></article>
+                <article>
+                  <span>考试整体 AI 分析次数</span>
+                  <strong>{{ balances.examOverallAiQuota }}</strong>
+                </article>
+                <article>
+                  <span>考试个人 AI 分析次数</span>
+                  <strong>{{ balances.examPersonalAiQuota }}</strong>
+                </article>
                 <article>
                   <span>有效资料访问权</span>
                   <strong>

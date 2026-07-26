@@ -3,6 +3,7 @@ import type { ApiResponse } from '@/types/api'
 import type {
   CandidateExamOverview,
   ExamCandidateOption,
+  ExamCandidatePage,
   ExamAnswer,
   ExamAnswerPayload,
   ExamEligibility,
@@ -22,6 +23,8 @@ import type {
   ExamGradingDetail,
   ExamStatistics,
   ExamWritePayload,
+  ExamAiAnalysis,
+  ExamAiAnalysisPage,
   Question,
   QuestionBank,
   QuestionListParams,
@@ -160,6 +163,16 @@ export async function searchExamCandidates(keyword = ''): Promise<ExamCandidateO
   )
 }
 
+export async function searchExamCandidatePage(
+  params: { keyword?: string; pageNumber?: number; pageSize?: number } = {},
+): Promise<ExamCandidatePage> {
+  return data(
+    await http.get<ApiResponse<ExamCandidatePage>>('/publisher/exam-candidates/search', {
+      params,
+    }),
+  )
+}
+
 export async function listAssignedExams(): Promise<ExamSummary[]> {
   return data(await http.get<ApiResponse<ExamSummary[]>>('/exams'))
 }
@@ -270,6 +283,52 @@ export async function getExamStatistics(examId: number): Promise<ExamStatistics>
   return data(
     await http.get<ApiResponse<ExamStatistics>>(
       `/publisher/exams/${examId}/grading/statistics`,
+    ),
+  )
+}
+
+export async function getOverallExamAiAnalysis(
+  examId: number,
+): Promise<ExamAiAnalysisPage> {
+  return data(
+    await http.get<ApiResponse<ExamAiAnalysisPage>>(
+      `/publisher/exams/${examId}/grading/ai-analysis`,
+    ),
+  )
+}
+
+export async function generateOverallExamAiAnalysis(
+  examId: number,
+  requestId: string,
+): Promise<ExamAiAnalysis> {
+  return data(
+    await http.post<ApiResponse<ExamAiAnalysis>>(
+      `/publisher/exams/${examId}/grading/ai-analysis`,
+      { requestId },
+      { timeout: 630_000 },
+    ),
+  )
+}
+
+export async function getPersonalExamAiAnalysis(
+  examId: number,
+): Promise<ExamAiAnalysisPage> {
+  return data(
+    await http.get<ApiResponse<ExamAiAnalysisPage>>(
+      `/exams/${examId}/result/ai-analysis`,
+    ),
+  )
+}
+
+export async function generatePersonalExamAiAnalysis(
+  examId: number,
+  requestId: string,
+): Promise<ExamAiAnalysis> {
+  return data(
+    await http.post<ApiResponse<ExamAiAnalysis>>(
+      `/exams/${examId}/result/ai-analysis`,
+      { requestId },
+      { timeout: 630_000 },
     ),
   )
 }

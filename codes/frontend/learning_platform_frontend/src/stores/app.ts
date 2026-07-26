@@ -23,6 +23,7 @@ export const useAppStore = defineStore('app', () => {
     }
     if (authStore.hasRole('ADMIN')) {
       items.push({ label: '管理后台', path: '/admin' })
+      items.push({ label: '教师审核', path: '/admin/offline-teachers' })
       items.push({ label: 'AI 配置', path: '/admin/ai' })
     }
     return items

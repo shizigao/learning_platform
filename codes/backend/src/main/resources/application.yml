@@ -63,6 +63,9 @@ management:
 
 app:
   environment: ${APP_ENV:local}
+  offline-teaching:
+    security:
+      encryption-key: ${TEACHER_DATA_ENCRYPTION_KEY:}
   exam:
     runtime-cache-enabled: ${EXAM_RUNTIME_CACHE_ENABLED:true}
     timeout-scan-ms: ${EXAM_TIMEOUT_SCAN_MS:5000}

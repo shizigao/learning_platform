@@ -38,7 +38,7 @@ onMounted(async () => {
     </SectionPageHeader>
     <div v-loading="loading" class="record-list">
       <RouterLink v-for="item in items" :key="item.content.id" :to="`/contents/${item.content.id}/learn`" class="record-card">
-        <div class="record-main"><el-tag effect="light">{{ item.content.contentType }}</el-tag><div><h3>{{ item.content.title }}</h3><p>最后学习：{{ new Date(item.progress.lastLearnedAt).toLocaleString() }}</p></div></div>
+        <div class="record-main"><el-tag effect="light">{{ item.content.categoryName || '学习资料' }}</el-tag><div><h3>{{ item.content.title }}</h3><p>最后学习：{{ new Date(item.progress.lastLearnedAt).toLocaleString() }}</p></div></div>
         <div class="record-progress"><strong>{{ Number(item.progress.progressPercent) }}%</strong><el-progress :percentage="Number(item.progress.progressPercent)" :show-text="false" /></div>
       </RouterLink>
     </div>

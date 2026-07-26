@@ -57,6 +57,20 @@ const filters = reactive<{
   keyword: string
   pageNumber: number
 }>({ keyword: '', pageNumber: 1 })
+const selectedBank = computed(() => banks.value.find((bank) => bank.id === filters.bankId))
+const bankPickerVisible = ref(false)
+const bankKeyword = ref('')
+const filteredBanks = computed(() => {
+  const keyword = bankKeyword.value.trim().toLowerCase()
+  if (!keyword) return banks.value
+  return banks.value.filter(
+    (bank) =>
+      bank.name.toLowerCase().includes(keyword) ||
+      (bank.description ?? '').toLowerCase().includes(keyword),
+  )
+})
+const deleteBankDialogVisible = ref(false)
+const deleteBankId = ref<number>()
 
 const bankDialogVisible = ref(false)
 const bankSaving = ref(false)
@@ -92,10 +106,16 @@ const answerOptionKeys = computed(() => form.options.map((option) => option.key.
 
 async function loadBanks(): Promise<void> {
   banks.value = await listQuestionBanks()
-  if (!form.bankId && banks.value.length) form.bankId = banks.value[0]!.id
+  if (filters.bankId && !banks.value.some((bank) => bank.id === filters.bankId)) {
+    filters.bankId = undefined
+  }
 }
 
 async function loadQuestions(): Promise<void> {
+  if (!filters.bankId) {
+    page.value = { items: [], total: 0, pageNumber: 1, pageSize: 12, totalPages: 0 }
+    return
+  }
   loading.value = true
   try {
     page.value = await listQuestions({ ...filters, pageSize: 12 })
@@ -143,6 +163,9 @@ async function removeBank(bank: QuestionBank): Promise<void> {
       type: 'warning',
     })
     await deleteQuestionBank(bank.id)
+    if (filters.bankId === bank.id) filters.bankId = undefined
+    deleteBankId.value = undefined
+    deleteBankDialogVisible.value = false
     await loadBanks()
     ElMessage.success('题库已删除')
   } catch (error) {
@@ -150,9 +173,36 @@ async function removeBank(bank: QuestionBank): Promise<void> {
   }
 }
 
+function selectBank(bank: QuestionBank): void {
+  filters.bankId = bank.id
+  filters.keyword = ''
+  filters.questionType = undefined
+  filters.pageNumber = 1
+  bankPickerVisible.value = false
+  void loadQuestions()
+}
+
+function openDeleteBank(): void {
+  deleteBankId.value = undefined
+  deleteBankDialogVisible.value = true
+}
+
+function confirmDeleteBank(): void {
+  const bank = banks.value.find((item) => item.id === deleteBankId.value)
+  if (!bank) {
+    ElMessage.warning('请选择要删除的题库')
+    return
+  }
+  void removeBank(bank)
+}
+
 function resetQuestionForm(question?: Question): void {
+  if (!filters.bankId) {
+    ElMessage.warning('请先选择题库')
+    return
+  }
   editingQuestionId.value = question?.id
-  form.bankId = question?.bankId ?? banks.value[0]?.id ?? 0
+  form.bankId = filters.bankId
   form.questionType = question?.questionType ?? 'SINGLE_CHOICE'
   form.stem = question?.stem ?? ''
   form.options = question?.options.map((option) => ({
@@ -300,7 +350,6 @@ function search(): void {
 onMounted(async () => {
   try {
     await loadBanks()
-    await loadQuestions()
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '题库加载失败')
   }
@@ -317,28 +366,33 @@ onMounted(async () => {
         description="维护五类题目、标准答案和解析，题目数据仅对所属发布者开放"
       >
         <el-button @click="openBank()">新建题库</el-button>
-        <el-button type="primary" :icon="Plus" :disabled="banks.length === 0" @click="resetQuestionForm()">
+        <el-button :disabled="banks.length === 0" @click="bankPickerVisible = true">选择题库</el-button>
+        <el-button type="danger" plain :disabled="banks.length === 0" @click="openDeleteBank">
+          删除题库
+        </el-button>
+        <el-button type="primary" :icon="Plus" :disabled="!selectedBank" @click="resetQuestionForm()">
           新建题目
         </el-button>
       </SectionPageHeader>
 
-      <div v-if="banks.length" class="bank-strip">
-        <div v-for="bank in banks" :key="bank.id" class="bank-chip">
-          <button type="button" @click="filters.bankId = bank.id; search()">
-            <strong>{{ bank.name }}</strong><span>{{ bank.description || '暂无说明' }}</span>
-          </button>
-          <el-button link type="primary" @click="openBank(bank)">编辑</el-button>
-          <el-button link type="danger" @click="removeBank(bank)">删除</el-button>
+      <div v-if="selectedBank" class="selected-bank-card">
+        <div>
+          <span>当前题库</span>
+          <strong>{{ selectedBank.name }}</strong>
+          <p>{{ selectedBank.description || '暂无说明' }}</p>
         </div>
+        <el-button type="primary" plain @click="openBank(selectedBank)">编辑题库</el-button>
       </div>
-      <el-empty v-else description="请先创建一个题库" />
+      <el-empty
+        v-else
+        :description="banks.length ? '请先选择一个题库' : '暂无题库，请先新建题库'"
+      >
+        <el-button v-if="banks.length" type="primary" @click="bankPickerVisible = true">选择题库</el-button>
+      </el-empty>
 
-      <template v-if="banks.length">
+      <template v-if="selectedBank">
         <div class="toolbar">
           <el-input v-model="filters.keyword" clearable placeholder="搜索题干" @keyup.enter="search" />
-          <el-select v-model="filters.bankId" clearable placeholder="全部题库">
-            <el-option v-for="bank in banks" :key="bank.id" :label="bank.name" :value="bank.id" />
-          </el-select>
           <el-select v-model="filters.questionType" clearable placeholder="全部题型">
             <el-option v-for="(label, value) in typeLabels" :key="value" :label="label" :value="value" />
           </el-select>
@@ -383,6 +437,43 @@ onMounted(async () => {
       </template>
     </div>
 
+    <el-dialog v-model="bankPickerVisible" title="选择题库" width="min(680px, 94vw)">
+      <el-input v-model="bankKeyword" clearable placeholder="搜索题库名称或说明" />
+      <div class="bank-picker-list">
+        <button
+          v-for="bank in filteredBanks"
+          :key="bank.id"
+          type="button"
+          :class="{ active: bank.id === filters.bankId }"
+          @click="selectBank(bank)"
+        >
+          <strong>{{ bank.name }}</strong>
+          <span>{{ bank.description || '暂无说明' }}</span>
+        </button>
+        <el-empty v-if="filteredBanks.length === 0" :image-size="70" description="没有匹配的题库" />
+      </div>
+    </el-dialog>
+
+    <el-dialog v-model="deleteBankDialogVisible" title="删除题库" width="min(520px, 94vw)">
+      <el-alert
+        title="非空题库不能删除，请先删除题库中的题目。"
+        type="warning"
+        :closable="false"
+        show-icon
+      />
+      <el-form label-position="top" class="delete-bank-form">
+        <el-form-item label="请选择要删除的题库" required>
+          <el-select v-model="deleteBankId" filterable placeholder="输入题库名称搜索">
+            <el-option v-for="bank in banks" :key="bank.id" :label="bank.name" :value="bank.id" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="deleteBankDialogVisible = false">取消</el-button>
+        <el-button type="danger" :disabled="!deleteBankId" @click="confirmDeleteBank">删除题库</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="bankDialogVisible" :title="editingBankId ? '编辑题库' : '新建题库'" width="500px">
       <el-form label-position="top">
         <el-form-item label="题库名称" required><el-input v-model="bankForm.name" maxlength="150" /></el-form-item>
@@ -398,9 +489,7 @@ onMounted(async () => {
       <el-form label-position="top">
         <div class="form-grid">
           <el-form-item label="所属题库" required>
-            <el-select v-model="form.bankId">
-              <el-option v-for="bank in banks" :key="bank.id" :label="bank.name" :value="bank.id" />
-            </el-select>
+            <el-input :model-value="selectedBank?.name ?? ''" disabled />
           </el-form-item>
           <el-form-item label="题型" required>
             <el-select v-model="form.questionType">
@@ -471,12 +560,14 @@ onMounted(async () => {
 
 <style scoped>
 .exam-page { min-height: calc(100vh - 145px); padding: 42px 0 76px; background: linear-gradient(180deg, #f4f7ff, #f8f9fc 330px); }
-.bank-strip { display: grid; gap: 12px; margin-bottom: 20px; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr)); }
-.bank-chip { display: flex; border: 1px solid var(--lp-border); border-radius: 14px; align-items: center; background: #fff; padding: 12px; }
-.bank-chip button { min-width: 0; border: 0; flex: 1; background: transparent; cursor: pointer; text-align: left; }
-.bank-chip strong, .bank-chip span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bank-chip span { margin-top: 5px; color: var(--lp-text-secondary); font-size: 12px; }
-.toolbar { display: grid; gap: 12px; margin-bottom: 18px; grid-template-columns: minmax(220px, 1fr) 170px 150px auto; }
+.selected-bank-card { display: flex; border: 1px solid #dbe6ff; border-radius: 18px; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 20px; background: #fff; box-shadow: var(--lp-shadow); padding: 20px 24px; }
+.selected-bank-card span, .selected-bank-card strong { display: block; }.selected-bank-card span { color: var(--lp-primary); font-size: 12px; font-weight: 800; }.selected-bank-card strong { margin-top: 5px; font-size: 20px; }.selected-bank-card p { margin: 5px 0 0; color: var(--lp-text-secondary); }
+.bank-picker-list { display: grid; overflow-y: auto; max-height: 420px; gap: 10px; margin-top: 16px; }
+.bank-picker-list button { display: block; width: 100%; border: 1px solid var(--lp-border); border-radius: 12px; background: #fff; cursor: pointer; padding: 14px 16px; text-align: left; }
+.bank-picker-list button:hover, .bank-picker-list button.active { border-color: var(--lp-primary); background: #f4f8ff; }
+.bank-picker-list strong, .bank-picker-list span { display: block; }.bank-picker-list span { margin-top: 5px; color: var(--lp-text-secondary); font-size: 13px; }
+.delete-bank-form { margin-top: 18px; }.delete-bank-form .el-select { width: 100%; }
+.toolbar { display: grid; gap: 12px; margin-bottom: 18px; grid-template-columns: minmax(220px, 1fr) 150px auto; }
 .table-card { overflow: hidden; border: 1px solid var(--lp-border); border-radius: 18px; background: #fff; box-shadow: var(--lp-shadow); padding: 8px 16px 16px; }
 .stem, .table-card small { display: block; }
 .table-card small { overflow: hidden; max-width: 480px; margin-top: 6px; color: #98a2b3; text-overflow: ellipsis; white-space: nowrap; }
@@ -488,5 +579,5 @@ onMounted(async () => {
 .option-key { width: 74px; }
 .blank-row > span { width: 58px; color: var(--lp-text-secondary); font-size: 13px; }
 .switch-row { display: flex; gap: 24px; margin: 14px 0 22px; }
-@media (max-width: 760px) { .toolbar, .form-grid { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .toolbar, .form-grid { grid-template-columns: 1fr; }.selected-bank-card { align-items: flex-start; flex-direction: column; } }
 </style>

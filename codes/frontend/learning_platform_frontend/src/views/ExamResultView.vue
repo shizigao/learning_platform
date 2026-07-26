@@ -65,7 +65,15 @@ onMounted(load)
               <p v-if="!result.result.gradingCompleted">主观题尚未全部批改，分数可能继续变化。</p>
               <p v-else>{{ result.result.passed ? '恭喜，你已通过本场考试。' : '本次未达到及格分，请继续努力。' }}</p>
             </div>
-            <strong>{{ Number(result.result.totalScore).toFixed(2) }}<small> 分</small></strong>
+            <div class="result-actions">
+              <strong>{{ Number(result.result.totalScore).toFixed(2) }}<small> 分</small></strong>
+              <RouterLink
+                v-if="result.result.gradingCompleted && result.answersVisible"
+                :to="`/exams/${examId}/result/ai-analysis`"
+              >
+                <el-button type="primary" plain>AI 分析</el-button>
+              </RouterLink>
+            </div>
           </header>
 
           <div class="summary-grid">
@@ -108,7 +116,8 @@ onMounted(load)
 .result-hero { display: flex; border-radius: 22px; align-items: center; justify-content: space-between; color: #fff; background: linear-gradient(135deg, #344054, #667085); padding: 30px 36px; }
 .result-hero.passed { background: linear-gradient(135deg, #176b4d, #2fa36b); }
 .result-hero span { font-size: 12px; font-weight: 900; letter-spacing: .16em; }.result-hero h1 { margin: 8px 0; }.result-hero p { margin: 0; opacity: .84; }
-.result-hero > strong { font-size: 52px; }.result-hero small { font-size: 18px; }
+.result-actions { display: flex; align-items: flex-end; flex-direction: column; gap: 12px; }
+.result-actions > strong { font-size: 52px; }.result-hero small { font-size: 18px; }
 .summary-grid { display: grid; gap: 14px; margin-top: 18px; grid-template-columns: repeat(5, 1fr); }
 .summary-grid article { border: 1px solid var(--lp-border); border-radius: 14px; background: #fff; padding: 18px; }
 .summary-grid span { color: var(--lp-text-secondary); font-size: 13px; }.summary-grid strong { display: block; margin-top: 8px; font-size: 20px; }

@@ -3,19 +3,31 @@ package com.learningplatform.content.service;
 import com.learningplatform.common.api.ErrorCode;
 import com.learningplatform.common.exception.BusinessException;
 import com.learningplatform.common.page.PageResult;
+import com.learningplatform.common.page.PageQuery;
+import com.learningplatform.classroom.mapper.ClassScopeMapper;
+import com.learningplatform.classroom.service.ClassroomService;
 import com.learningplatform.content.domain.ContentFileRole;
+import com.learningplatform.content.domain.ContentDistributionMode;
 import com.learningplatform.content.domain.ContentStatus;
+import com.learningplatform.content.domain.ContentPublicationStats;
 import com.learningplatform.content.domain.ContentType;
 import com.learningplatform.content.domain.LearningContent;
 import com.learningplatform.content.dto.ContentDetailResponse;
 import com.learningplatform.content.dto.AdminContentListQuery;
 import com.learningplatform.content.dto.ContentFileResponse;
 import com.learningplatform.content.dto.ContentListQuery;
+import com.learningplatform.content.dto.ContentReferenceSearchQuery;
 import com.learningplatform.content.dto.ContentSummaryResponse;
 import com.learningplatform.content.dto.ContentWriteRequest;
 import com.learningplatform.content.dto.PublisherContentListQuery;
 import com.learningplatform.content.mapper.ContentFileMapper;
 import com.learningplatform.content.mapper.LearningContentMapper;
+import com.learningplatform.content.storage.MinioStorageService;
+import com.learningplatform.user.domain.User;
+import com.learningplatform.user.service.UserAvatarService;
+import com.learningplatform.user.service.UserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,23 +37,39 @@ import java.util.List;
 
 @Service
 public class LearningContentService {
+    private static final Logger log = LoggerFactory.getLogger(LearningContentService.class);
     private static final BigDecimal MINIMUM_PAID_PRICE = new BigDecimal("0.01");
 
     private final LearningContentMapper contentMapper;
     private final ContentFileMapper fileMapper;
     private final ContentCategoryService categoryService;
     private final ContentAccessService accessService;
+    private final MinioStorageService storageService;
+    private final ClassScopeMapper classScopeMapper;
+    private final ClassroomService classroomService;
+    private final UserService userService;
+    private final UserAvatarService avatarService;
 
     public LearningContentService(
             LearningContentMapper contentMapper,
             ContentFileMapper fileMapper,
             ContentCategoryService categoryService,
-            ContentAccessService accessService
+            ContentAccessService accessService,
+            MinioStorageService storageService,
+            ClassScopeMapper classScopeMapper,
+            ClassroomService classroomService,
+            UserService userService,
+            UserAvatarService avatarService
     ) {
         this.contentMapper = contentMapper;
         this.fileMapper = fileMapper;
         this.categoryService = categoryService;
         this.accessService = accessService;
+        this.storageService = storageService;
+        this.classScopeMapper = classScopeMapper;
+        this.classroomService = classroomService;
+        this.userService = userService;
+        this.avatarService = avatarService;
     }
 
     @Transactional
@@ -54,6 +82,7 @@ public class LearningContentService {
         if (contentMapper.insert(content) != 1) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "创建学习资料失败");
         }
+        replaceClassScopes(content.getId(), publisherId, request);
         return publisherDetail(content.getId(), publisherId, false);
     }
 
@@ -75,6 +104,7 @@ public class LearningContentService {
         if (contentMapper.updateEditable(content) != 1) {
             throw invalidState("只有草稿或已驳回资料可以编辑");
         }
+        replaceClassScopes(contentId, requesterUserId, request);
         return publisherDetail(contentId, requesterUserId, requesterAdmin);
     }
 
@@ -83,18 +113,18 @@ public class LearningContentService {
         long total = contentMapper.countPublished(
                 keyword,
                 query.getCategoryId(),
-                query.getContentType(),
+                null,
                 query.getFree()
         );
         List<ContentSummaryResponse> items = contentMapper.findPublished(
                         keyword,
                         query.getCategoryId(),
-                        query.getContentType(),
+                        null,
                         query.getFree(),
                         query.offset(),
                         query.getPageSize()
                 ).stream()
-                .map(ContentSummaryResponse::from)
+                .map(this::summary)
                 .toList();
         return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
     }
@@ -112,6 +142,9 @@ public class LearningContentService {
         contentMapper.incrementViewCount(contentId);
         content.setViewCount(valueOrZero(content.getViewCount()) + 1);
         boolean hasAccess = accessService.hasAccess(requesterUserId, requesterAdmin, content);
+        if (content.getDistributionMode() == ContentDistributionMode.CLASS && !hasAccess) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅资料发放班级的有效成员可以访问");
+        }
         return detail(content, hasAccess, hasAccess);
     }
 
@@ -132,6 +165,64 @@ public class LearningContentService {
                         query.offset(),
                         query.getPageSize()
                 ).stream()
+                .map(this::summary)
+                .toList();
+        return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
+    }
+
+    public PageResult<ContentSummaryResponse> listPublicByPublisher(
+            Long publisherId,
+            PageQuery query
+    ) {
+        long total = contentMapper.countPublicByPublisher(publisherId);
+        List<ContentSummaryResponse> items = contentMapper.findPublicByPublisher(
+                        publisherId,
+                        query.offset(),
+                        query.getPageSize()
+                ).stream()
+                .map(this::summary)
+                .toList();
+        return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
+    }
+
+    public ContentPublicationStats publicationStats(Long publisherId) {
+        return contentMapper.publicationStats(publisherId);
+    }
+
+    public PageResult<ContentSummaryResponse> listForClass(
+            Long classId,
+            Long requesterId,
+            PageQuery query
+    ) {
+        classroomService.requireActiveMember(classId, requesterId);
+        long total = classScopeMapper.countPublishedContents(classId);
+        List<ContentSummaryResponse> items = classScopeMapper.findPublishedContents(
+                        classId,
+                        query.offset(),
+                        query.getPageSize()
+                ).stream()
+                .map(this::summary)
+                .toList();
+        return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
+    }
+
+    public PageResult<ContentSummaryResponse> listReferenceCandidates(
+            ContentReferenceSearchQuery query
+    ) {
+        String titleKeyword = normalize(query.getTitleKeyword());
+        String publisherKeyword = normalize(query.getPublisherKeyword());
+        long total = contentMapper.countReferenceCandidates(
+                titleKeyword,
+                publisherKeyword,
+                query.getExcludeContentId()
+        );
+        List<ContentSummaryResponse> items = contentMapper.findReferenceCandidates(
+                        titleKeyword,
+                        publisherKeyword,
+                        query.getExcludeContentId(),
+                        query.offset(),
+                        query.getPageSize()
+                ).stream()
                 .map(ContentSummaryResponse::from)
                 .toList();
         return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
@@ -146,7 +237,7 @@ public class LearningContentService {
                         query.offset(),
                         query.getPageSize()
                 ).stream()
-                .map(ContentSummaryResponse::from)
+                .map(this::summary)
                 .toList();
         return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
     }
@@ -249,10 +340,37 @@ public class LearningContentService {
         content.setCategoryId(request.categoryId());
         content.setTitle(request.title().trim());
         content.setSummary(normalize(request.summary()));
-        content.setContentType(request.contentType());
+        content.setContentType(ContentType.GENERAL);
         content.setArticleBody(normalize(request.articleBody()));
-        content.setFree(request.isFree());
-        content.setPrice(normalizePrice(request.isFree(), request.price()));
+        ContentDistributionMode mode = request.distributionMode() == null
+                ? ContentDistributionMode.PUBLIC
+                : request.distributionMode();
+        content.setDistributionMode(mode);
+        if (mode == ContentDistributionMode.CLASS) {
+            content.setFree(true);
+            content.setPrice(BigDecimal.ZERO.setScale(2));
+        } else {
+            content.setFree(request.isFree());
+            content.setPrice(normalizePrice(request.isFree(), request.price()));
+        }
+    }
+
+    private void replaceClassScopes(
+            Long contentId,
+            Long publisherId,
+            ContentWriteRequest request
+    ) {
+        classScopeMapper.deleteContentScopes(contentId);
+        ContentDistributionMode mode = request.distributionMode() == null
+                ? ContentDistributionMode.PUBLIC
+                : request.distributionMode();
+        if (mode != ContentDistributionMode.CLASS) return;
+        classroomService.requireManageableClasses(request.classIds(), publisherId);
+        request.classIds().forEach(classId -> {
+            if (classScopeMapper.insertContentScope(contentId, classId) != 1) {
+                throw new BusinessException(ErrorCode.INTERNAL_ERROR, "保存资料班级范围失败");
+            }
+        });
     }
 
     private BigDecimal normalizePrice(Boolean free, BigDecimal requestedPrice) {
@@ -267,18 +385,10 @@ public class LearningContentService {
 
     private void validateReadyForReview(LearningContent content) {
         boolean hasBody = content.getArticleBody() != null && !content.getArticleBody().isBlank();
-        int relevantFiles = switch (content.getContentType()) {
-            case ARTICLE -> 0;
-            case DOCUMENT -> fileMapper.countByContentIdAndRole(content.getId(), ContentFileRole.CONTENT);
-            case VIDEO -> fileMapper.countByContentIdAndRole(content.getId(), ContentFileRole.VIDEO);
-            case ATTACHMENT -> fileMapper.countByContentIdAndRole(content.getId(), ContentFileRole.ATTACHMENT);
-            case MIXED -> fileMapper.countByContentId(content.getId());
-        };
-        boolean ready = switch (content.getContentType()) {
-            case ARTICLE -> hasBody;
-            case DOCUMENT, VIDEO, ATTACHMENT -> relevantFiles > 0;
-            case MIXED -> hasBody || relevantFiles > 0;
-        };
+        int relevantFiles = fileMapper.countByContentId(content.getId())
+                - fileMapper.countByContentIdAndRole(content.getId(), ContentFileRole.COVER)
+                - fileMapper.countByContentIdAndRole(content.getId(), ContentFileRole.INLINE_IMAGE);
+        boolean ready = hasBody || relevantFiles > 0;
         if (!ready) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "资料正文或对应文件尚未准备完整");
         }
@@ -292,7 +402,42 @@ public class LearningContentService {
         List<ContentFileResponse> files = fileMapper.findByContentId(content.getId()).stream()
                 .map(ContentFileResponse::from)
                 .toList();
-        return ContentDetailResponse.from(content, files, includeProtectedBody, hasAccess);
+        User publisher = userService.getRequiredById(content.getPublisherId());
+        return ContentDetailResponse.from(
+                content,
+                files,
+                includeProtectedBody,
+                hasAccess,
+                coverUrl(content),
+                classScopeMapper.findContentClassIds(content.getId()),
+                publisher.getUsername(),
+                avatarService.avatarUrl(publisher)
+        );
+    }
+
+    public ContentSummaryResponse summary(LearningContent content) {
+        return ContentSummaryResponse.from(content, coverUrl(content));
+    }
+
+    private String coverUrl(LearningContent content) {
+        if (content.getCoverFileId() == null) {
+            return null;
+        }
+        return fileMapper.findById(content.getCoverFileId())
+                .filter(file -> file.getFileRole() == ContentFileRole.COVER)
+                .map(file -> {
+                    try {
+                        return storageService.createAuthorizedPreviewUrl(file.getObjectName());
+                    } catch (RuntimeException exception) {
+                        log.warn(
+                                "Unable to create cover URL for contentId={} fileId={}",
+                                content.getId(),
+                                file.getId()
+                        );
+                        return null;
+                    }
+                })
+                .orElse(null);
     }
 
     private long valueOrZero(Long value) {

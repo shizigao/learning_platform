@@ -1,7 +1,7 @@
 <template>
   <nav class="exam-nav" aria-label="发布者考试模块">
     <RouterLink to="/publisher/questions">题库</RouterLink>
-    <RouterLink to="/publisher/papers">固定试卷</RouterLink>
+    <RouterLink to="/publisher/papers">试卷</RouterLink>
     <RouterLink to="/publisher/exams">考试管理</RouterLink>
     <RouterLink to="/publisher">学习资料</RouterLink>
   </nav>

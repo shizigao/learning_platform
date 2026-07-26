@@ -1,3 +1,47 @@
+CREATE TABLE learning_class (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    owner_id BIGINT NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    description VARCHAR(1000),
+    invite_code VARCHAR(16) NOT NULL UNIQUE,
+    invite_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+    version INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT fk_test_class_owner FOREIGN KEY (owner_id) REFERENCES `user` (id)
+);
+
+CREATE TABLE class_member (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    class_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    role VARCHAR(32) NOT NULL DEFAULT 'MEMBER',
+    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+    joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    left_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_test_class_member UNIQUE (class_id, user_id),
+    CONSTRAINT fk_test_class_member_class FOREIGN KEY (class_id) REFERENCES learning_class (id),
+    CONSTRAINT fk_test_class_member_user FOREIGN KEY (user_id) REFERENCES `user` (id)
+);
+
+CREATE TABLE class_announcement (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    class_id BIGINT NOT NULL,
+    author_id BIGINT NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    body CLOB NOT NULL,
+    pinned BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    CONSTRAINT fk_test_announcement_class FOREIGN KEY (class_id) REFERENCES learning_class (id),
+    CONSTRAINT fk_test_announcement_author FOREIGN KEY (author_id) REFERENCES `user` (id)
+);
+
 CREATE TABLE content_category (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     parent_id BIGINT NULL,
@@ -18,9 +62,10 @@ CREATE TABLE learning_content (
     category_id BIGINT NOT NULL,
     title VARCHAR(200) NOT NULL,
     summary VARCHAR(1000) NULL,
-    content_type VARCHAR(32) NOT NULL,
+    content_type VARCHAR(32) NOT NULL DEFAULT 'GENERAL',
     article_body CLOB NULL,
     cover_file_id BIGINT NULL,
+    distribution_mode VARCHAR(32) NOT NULL DEFAULT 'PUBLIC',
     is_free BOOLEAN NOT NULL DEFAULT TRUE,
     price DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     status VARCHAR(32) NOT NULL DEFAULT 'DRAFT',
@@ -36,6 +81,15 @@ CREATE TABLE learning_content (
     deleted BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT fk_test_content_publisher FOREIGN KEY (publisher_id) REFERENCES `user` (id),
     CONSTRAINT fk_test_content_category FOREIGN KEY (category_id) REFERENCES content_category (id)
+);
+
+CREATE TABLE content_class_scope (
+    content_id BIGINT NOT NULL,
+    class_id BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (content_id, class_id),
+    CONSTRAINT fk_test_content_scope_content FOREIGN KEY (content_id) REFERENCES learning_content (id),
+    CONSTRAINT fk_test_content_scope_class FOREIGN KEY (class_id) REFERENCES learning_class (id)
 );
 
 CREATE TABLE content_file (

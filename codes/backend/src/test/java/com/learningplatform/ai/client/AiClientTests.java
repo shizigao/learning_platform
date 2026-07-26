@@ -143,6 +143,30 @@ class AiClientTests {
         server.verify();
     }
 
+    @Test
+    void mockReturnsCandidateBoundTeacherRecommendationJson() {
+        MockAiClient client = new MockAiClient("mock-teacher-model");
+        AiClientResponse response = client.complete(new AiClientRequest(
+                List.of(
+                        new AiMessage(
+                                AiRole.SYSTEM,
+                                "TASK:OFFLINE_TEACHER_RECOMMENDATION"
+                        ),
+                        new AiMessage(
+                                AiRole.USER,
+                                "{\"candidateTeachers\":[{\"teacherId\":37}]}"
+                        )
+                ),
+                800,
+                0.2,
+                AiResponseFormat.JSON_OBJECT
+        ));
+
+        assertThat(response.content())
+                .contains("\"teacherId\": 37")
+                .doesNotContain("\"teacherId\": 1,");
+    }
+
     private AiProperties properties(
             String provider,
             String apiKey,

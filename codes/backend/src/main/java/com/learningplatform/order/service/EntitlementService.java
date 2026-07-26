@@ -46,7 +46,9 @@ public class EntitlementService {
     public EntitlementBalancesResponse balances(Long userId) {
         return new EntitlementBalancesResponse(
                 availableQuota(userId, EntitlementType.AI_QUOTA),
-                availableQuota(userId, EntitlementType.EXAM_QUOTA)
+                availableQuota(userId, EntitlementType.EXAM_QUOTA),
+                availableQuota(userId, EntitlementType.EXAM_OVERALL_AI_QUOTA),
+                availableQuota(userId, EntitlementType.EXAM_PERSONAL_AI_QUOTA)
         );
     }
 
@@ -186,11 +188,7 @@ public class EntitlementService {
             return entitlement;
         }
         int quantity = entitlementQuantity(item);
-        entitlement.setEntitlementType(
-                productType == ProductType.AI_PACKAGE
-                        ? EntitlementType.AI_QUOTA
-                        : EntitlementType.EXAM_QUOTA
-        );
+        entitlement.setEntitlementType(entitlementType(productType));
         entitlement.setTotalQuantity(quantity);
         entitlement.setAvailableQuantity(quantity);
         return entitlement;
@@ -276,9 +274,21 @@ public class EntitlementService {
 
     private void requireQuotaType(EntitlementType entitlementType) {
         if (entitlementType != EntitlementType.AI_QUOTA
-                && entitlementType != EntitlementType.EXAM_QUOTA) {
+                && entitlementType != EntitlementType.EXAM_QUOTA
+                && entitlementType != EntitlementType.EXAM_OVERALL_AI_QUOTA
+                && entitlementType != EntitlementType.EXAM_PERSONAL_AI_QUOTA) {
             throw invalid("该权益类型不支持次数操作");
         }
+    }
+
+    private EntitlementType entitlementType(ProductType productType) {
+        return switch (productType) {
+            case AI_PACKAGE -> EntitlementType.AI_QUOTA;
+            case EXAM_PACKAGE -> EntitlementType.EXAM_QUOTA;
+            case EXAM_OVERALL_AI_PACKAGE -> EntitlementType.EXAM_OVERALL_AI_QUOTA;
+            case EXAM_PERSONAL_AI_PACKAGE -> EntitlementType.EXAM_PERSONAL_AI_QUOTA;
+            case CONTENT -> throw invalid("资料商品不使用次数权益");
+        };
     }
 
     private void requirePositiveQuantity(int quantity) {

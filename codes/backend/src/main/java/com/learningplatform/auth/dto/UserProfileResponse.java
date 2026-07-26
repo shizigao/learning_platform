@@ -21,11 +21,19 @@ public record UserProfileResponse(
         LocalDateTime createdAt
 ) {
     public static UserProfileResponse from(User user, Set<RoleCode> roles) {
+        return from(user, roles, user.getAvatarUrl());
+    }
+
+    public static UserProfileResponse from(
+            User user,
+            Set<RoleCode> roles,
+            String resolvedAvatarUrl
+    ) {
         return new UserProfileResponse(
                 user.getId(),
                 user.getUsername(),
                 user.getNickname(),
-                user.getAvatarUrl(),
+                resolvedAvatarUrl,
                 user.getEmail(),
                 user.getPhone(),
                 user.getGender(),

@@ -1,10 +1,20 @@
 import type { PageResult } from '@/types/api'
 
-export type ProductType = 'CONTENT' | 'AI_PACKAGE' | 'EXAM_PACKAGE'
+export type ProductType =
+  | 'CONTENT'
+  | 'AI_PACKAGE'
+  | 'EXAM_PACKAGE'
+  | 'EXAM_OVERALL_AI_PACKAGE'
+  | 'EXAM_PERSONAL_AI_PACKAGE'
 export type ProductStatus = 'ACTIVE' | 'INACTIVE'
 export type OrderStatus = 'PENDING_PAYMENT' | 'PAID' | 'CANCELLED' | 'CLOSED' | 'REFUNDED'
 export type PaymentStatus = 'PENDING' | 'SUCCESS' | 'FAILED' | 'CLOSED' | 'REFUNDED'
-export type EntitlementType = 'CONTENT_ACCESS' | 'AI_QUOTA' | 'EXAM_QUOTA'
+export type EntitlementType =
+  | 'CONTENT_ACCESS'
+  | 'AI_QUOTA'
+  | 'EXAM_QUOTA'
+  | 'EXAM_OVERALL_AI_QUOTA'
+  | 'EXAM_PERSONAL_AI_QUOTA'
 export type EntitlementStatus = 'ACTIVE' | 'EXHAUSTED' | 'EXPIRED' | 'REVOKED'
 
 export interface Product {
@@ -92,6 +102,8 @@ export interface Entitlement {
 export interface EntitlementBalances {
   aiQuota: number
   examQuota: number
+  examOverallAiQuota: number
+  examPersonalAiQuota: number
 }
 
 export interface OrderListParams {

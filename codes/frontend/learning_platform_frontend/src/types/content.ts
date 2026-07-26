@@ -1,8 +1,15 @@
 import type { PageResult } from '@/types/api'
 
-export type ContentType = 'ARTICLE' | 'DOCUMENT' | 'VIDEO' | 'ATTACHMENT' | 'MIXED'
+export type ContentType = 'GENERAL' | 'ARTICLE' | 'DOCUMENT' | 'VIDEO' | 'ATTACHMENT' | 'MIXED'
 export type ContentStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'OFFLINE'
-export type ContentFileRole = 'COVER' | 'CONTENT' | 'VIDEO' | 'ATTACHMENT' | 'SUBTITLE'
+export type ContentDistributionMode = 'PUBLIC' | 'CLASS'
+export type ContentFileRole =
+  | 'COVER'
+  | 'INLINE_IMAGE'
+  | 'CONTENT'
+  | 'VIDEO'
+  | 'ATTACHMENT'
+  | 'SUBTITLE'
 
 export interface ContentCategory {
   id: number
@@ -18,11 +25,16 @@ export interface ContentSummary {
   id: number
   publisherId: number
   publisherName: string
+  publisherUsername?: string
+  publisherAvatarUrl?: string
   categoryId: number
+  categoryName?: string
   title: string
   summary?: string
   contentType: ContentType
   coverFileId?: number
+  coverUrl?: string
+  distributionMode: ContentDistributionMode
   isFree: boolean
   price: number
   status: ContentStatus
@@ -46,6 +58,7 @@ export interface ContentFile {
 
 export interface ContentDetail extends ContentSummary {
   articleBody?: string
+  classIds: number[]
   hasAccess: boolean
   rejectionReason?: string
   commentCount: number
@@ -58,8 +71,9 @@ export interface ContentWritePayload {
   categoryId: number
   title: string
   summary: string
-  contentType: ContentType
   articleBody: string
+  distributionMode: ContentDistributionMode
+  classIds: number[]
   isFree: boolean
   price: number
 }
@@ -67,7 +81,6 @@ export interface ContentWritePayload {
 export interface ContentListParams {
   keyword?: string
   categoryId?: number
-  contentType?: ContentType
   free?: boolean
   status?: ContentStatus
   pageNumber?: number
@@ -110,4 +123,5 @@ export interface ContentComment {
 }
 
 export type ContentPage = PageResult<ContentSummary>
+export type ContentCategoryPage = PageResult<ContentCategory>
 export type CommentPage = PageResult<ContentComment>

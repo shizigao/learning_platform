@@ -208,6 +208,26 @@ class ExamPublishingIntegrationTests {
     }
 
     @Test
+    void publisherCanSearchExamCandidatesWithPagination() throws Exception {
+        mockMvc.perform(get("/api/publisher/exam-candidates/search")
+                        .param("keyword", "exam_candidate")
+                        .param("pageNumber", "1")
+                        .param("pageSize", "1")
+                        .header(AUTHORIZATION, bearer(publisherToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].id").value(candidate.getId()))
+                .andExpect(jsonPath("$.data.items[0].username").value("exam_candidate"))
+                .andExpect(jsonPath("$.data.pageNumber").value(1))
+                .andExpect(jsonPath("$.data.pageSize").value(1))
+                .andExpect(jsonPath("$.data.total").value(1));
+
+        mockMvc.perform(get("/api/publisher/exam-candidates/search")
+                        .header(AUTHORIZATION, bearer(candidateToken)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void assignedCandidateCannotLoadQuestionsBeforeExamStarts() throws Exception {
         LocalDateTime start = LocalDateTime.now().plusHours(1);
         long examId = responseData(createExam(

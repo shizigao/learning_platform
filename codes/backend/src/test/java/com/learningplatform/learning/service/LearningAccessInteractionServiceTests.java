@@ -97,13 +97,22 @@ class LearningAccessInteractionServiceTests {
                 false,
                 paidContentId,
                 new UpdateLearningProgressRequest(new BigDecimal("20.00"), "page:2")
-        ).progressPercent()).isEqualByComparingTo("60.00");
-        assertThat(progressService.update(
+        ).progressPercent()).isEqualByComparingTo("20.00");
+        var completed = progressService.update(
                 learner.getId(),
                 false,
                 paidContentId,
                 new UpdateLearningProgressRequest(new BigDecimal("100.00"), "completed")
-        ).completedAt()).isNotNull();
+        );
+        assertThat(completed.completedAt()).isNotNull();
+        var reopened = progressService.update(
+                learner.getId(),
+                false,
+                paidContentId,
+                new UpdateLearningProgressRequest(new BigDecimal("80.00"), "reviewing")
+        );
+        assertThat(reopened.progressPercent()).isEqualByComparingTo("80.00");
+        assertThat(reopened.completedAt()).isNull();
     }
 
     @Test
@@ -129,16 +138,16 @@ class LearningAccessInteractionServiceTests {
         assertThatThrownBy(() -> interactionService.like(freeContentId, learner.getId(), false))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.CONFLICT));
-        assertThat(interactionService.unlike(freeContentId, learner.getId()).liked()).isFalse();
-        assertThatThrownBy(() -> interactionService.unlike(freeContentId, learner.getId()))
+        assertThat(interactionService.unlike(freeContentId, learner.getId(), false).liked()).isFalse();
+        assertThatThrownBy(() -> interactionService.unlike(freeContentId, learner.getId(), false))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.CONFLICT));
 
-        assertThat(interactionService.favorite(freeContentId, learner.getId()).favorited()).isTrue();
-        assertThatThrownBy(() -> interactionService.favorite(freeContentId, learner.getId()))
+        assertThat(interactionService.favorite(freeContentId, learner.getId(), false).favorited()).isTrue();
+        assertThatThrownBy(() -> interactionService.favorite(freeContentId, learner.getId(), false))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.CONFLICT));
-        assertThat(interactionService.unfavorite(freeContentId, learner.getId()).favorited()).isFalse();
+        assertThat(interactionService.unfavorite(freeContentId, learner.getId(), false).favorited()).isFalse();
 
         var root = interactionService.comment(
                 freeContentId,
@@ -152,7 +161,12 @@ class LearningAccessInteractionServiceTests {
                 false,
                 new CreateCommentRequest(root.id(), "感谢反馈")
         );
-        assertThat(interactionService.comments(freeContentId, new PageQuery()).total()).isEqualTo(2);
+        assertThat(interactionService.comments(
+                freeContentId,
+                learner.getId(),
+                false,
+                new PageQuery()
+        ).total()).isEqualTo(2);
 
         assertThatThrownBy(() -> interactionService.comment(
                 otherContentId,

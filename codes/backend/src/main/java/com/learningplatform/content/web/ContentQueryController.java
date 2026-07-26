@@ -5,6 +5,7 @@ import com.learningplatform.auth.security.AuthenticationPrincipalResolver;
 import com.learningplatform.common.api.ApiResponse;
 import com.learningplatform.common.page.PageResult;
 import com.learningplatform.content.dto.ContentCategoryResponse;
+import com.learningplatform.content.dto.ContentCategorySearchQuery;
 import com.learningplatform.content.dto.ContentDetailResponse;
 import com.learningplatform.content.dto.ContentListQuery;
 import com.learningplatform.content.dto.ContentSummaryResponse;
@@ -43,6 +44,20 @@ public class ContentQueryController {
     @GetMapping("/categories")
     public ApiResponse<List<ContentCategoryResponse>> categories() {
         return ApiResponse.success(categoryService.listEnabled());
+    }
+
+    @GetMapping("/categories/search")
+    public ApiResponse<PageResult<ContentCategoryResponse>> searchCategories(
+            @Valid @ModelAttribute ContentCategorySearchQuery query
+    ) {
+        return ApiResponse.success(categoryService.searchEnabled(query));
+    }
+
+    @GetMapping("/categories/{categoryId}")
+    public ApiResponse<ContentCategoryResponse> category(@PathVariable Long categoryId) {
+        return ApiResponse.success(ContentCategoryResponse.from(
+                categoryService.getRequiredEnabled(categoryId)
+        ));
     }
 
     @GetMapping("/contents")

@@ -6,6 +6,7 @@ import com.learningplatform.auth.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -58,6 +59,7 @@ public class SecurityConfig {
                                         + "base-uri 'none'; form-action 'none'"
                         )))
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(HttpMethod.GET, "/api/users/*/avatar").permitAll()
                         .requestMatchers(
                                 "/api/health",
                                 "/api/auth/register",
@@ -66,6 +68,7 @@ public class SecurityConfig {
                                 "/error"
                         ).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/class-management/**").hasAnyRole("PUBLISHER", "ADMIN")
                         .requestMatchers("/api/publisher/**").hasAnyRole("PUBLISHER", "ADMIN")
                         .requestMatchers("/api/**").hasAnyRole("USER", "PUBLISHER", "ADMIN")
                         .anyRequest().authenticated())

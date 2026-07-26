@@ -52,6 +52,20 @@ public interface ExamAnswerMapper {
             FROM exam_answer ea
             JOIN exam_paper_question epq ON epq.id = ea.paper_question_id
             JOIN question q ON q.id = ea.question_id
+            JOIN exam_attempt a ON a.id = ea.attempt_id
+            JOIN exam_result r ON r.attempt_id = a.id
+            WHERE a.exam_id = #{examId}
+              AND r.grading_completed = TRUE
+            ORDER BY epq.sort_order ASC, ea.id ASC
+            """)
+    List<ExamAnswer> findGradedByExamId(Long examId);
+
+    @Select("""
+            SELECT
+            """ + COLUMNS + """
+            FROM exam_answer ea
+            JOIN exam_paper_question epq ON epq.id = ea.paper_question_id
+            JOIN question q ON q.id = ea.question_id
             WHERE ea.attempt_id = #{attemptId} AND ea.question_id = #{questionId}
             """)
     Optional<ExamAnswer> findOne(

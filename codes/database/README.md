@@ -35,6 +35,33 @@ FLUSH PRIVILEGES;
 
 两个脚本都先执行 `USE learning_platform`。`001_schema.sql` 只使用 `CREATE TABLE IF NOT EXISTS`，不会删除现有数据；如在已有结构上执行，必须先让 AI 生成增量迁移脚本，不能依靠 `IF NOT EXISTS` 自动更新旧表。
 
+### 从 MVP 版本升级
+
+已有数据库先完成备份，再执行：
+
+1. `003_unify_content_type.sql`
+2. `004_classroom.sql`
+3. `005_exam_ai_analysis.sql`
+4. `006_user_account_info.sql`
+5. `007_offline_teaching.sql`
+6. `008_offline_teacher_availability.sql`
+
+`003_unify_content_type.sql` 会把历史五类资料类型统一为 `GENERAL`；`004_classroom.sql`
+会增加班级、成员、公告以及资料/考试班级发放范围；`005_exam_ai_analysis.sql`
+会增加考试结果 AI 分析报告、两类独立额度商品，并允许 AI 任务不绑定学习资料；
+`006_user_account_info.sql` 会增加用户头像的 MinIO 对象元数据表。
+`007_offline_teaching.sql` 会增加线下教师申请、公开教师资料、学生匹配偏好和
+AI 推荐结果表；`008_offline_teacher_availability.sql` 会为线下教师申请和公开
+教师资料增加可上课时间字段。以上脚本均不会删除历史业务数据。
+全新初始化的数据库无需执行增量脚本。
+
+### 线下教师推荐测试数据（可选）
+
+本地开发环境如需测试教师推荐，可在完成 `008_offline_teacher_availability.sql`
+后执行 `009_seed_offline_teacher_test_data.sql`。脚本会幂等创建或更新
+`teacher_test_01` 至 `teacher_test_20` 共 20 个发布者测试账号及对应的已审核
+教师资料，不会删除其他数据。统一测试密码记录在脚本头部；该脚本不得用于生产环境。
+
 ### 遇到过“Specified key was too long”时
 
 早期脚本曾直接对 MinIO 的长对象名建立联合唯一索引，在 `utf8mb4` 下会超过 InnoDB 的 3072 字节索引上限。当前脚本已改为对自动生成的 SHA-256 二进制列建立唯一索引。
@@ -62,9 +89,9 @@ SELECT config_key, config_value, value_type FROM system_config ORDER BY config_k
 
 预期结果：
 
-- 业务表共 33 张。
+- 业务表共 44 张。
 - 角色包含 `USER`、`PUBLISHER`、`ADMIN`。
-- 初始化商品包含 AI 次数包和考试发布次数包。
+- 初始化商品包含资料 AI、考试发布、考试整体 AI 分析和考试个人 AI 分析次数包。
 - `system_config` 不包含数据库密码、MinIO 密钥或 DeepSeek API Key。
 
 ## 五、IDEA 环境变量
@@ -75,9 +102,10 @@ SELECT config_key, config_value, value_type FROM system_config ORDER BY config_k
 DB_URL=jdbc:mysql://localhost:3306/learning_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
 DB_USERNAME=learning_platform
 DB_PASSWORD=<你的本机数据库密码>
+TEACHER_DATA_ENCRYPTION_KEY=<本机生成的 32 字节随机密钥对应的 Base64 文本>
 ```
 
-密码只填写在本机 IDEA 运行配置中，不要发给 AI。
+密码和教师敏感数据加密密钥只填写在本机 IDEA 运行配置中，不要写入配置文件、提交到版本库或发给 AI。
 
 ## 六、管理员初始化方案
 

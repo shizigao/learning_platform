@@ -12,14 +12,17 @@ import {
   listPapers,
   listPublisherExams,
   publishExam,
-  searchExamCandidates,
+  searchExamCandidatePage,
   updateExam,
 } from '@/api/exam'
 import PublisherExamNav from '@/components/PublisherExamNav.vue'
+import ClassPickerDialog from '@/components/ClassPickerDialog.vue'
 import SectionPageHeader from '@/components/SectionPageHeader.vue'
 import type {
   ExamCandidateOption,
+  ExamCandidatePage,
   ExamPage,
+  ExamPaperPage,
   ExamPaperSummary,
   ExamStatus,
   ExamSummary,
@@ -46,13 +49,37 @@ const editorVisible = ref(false)
 const editorLoading = ref(false)
 const saving = ref(false)
 const editingExamId = ref<number>()
-const readyPapers = ref<ExamPaperSummary[]>([])
-const candidateOptions = ref<ExamCandidateOption[]>([])
-const candidateSearching = ref(false)
+const selectedPaper = ref<ExamPaperSummary>()
+const selectedCandidates = ref<ExamCandidateOption[]>([])
+
+const paperPickerVisible = ref(false)
+const paperPickerLoading = ref(false)
+const paperPage = ref<ExamPaperPage>({
+  items: [],
+  total: 0,
+  pageNumber: 1,
+  pageSize: 10,
+  totalPages: 0,
+})
+const paperSearch = reactive({ keyword: '', pageNumber: 1 })
+
+const candidatePickerVisible = ref(false)
+const candidatePickerLoading = ref(false)
+const candidatePage = ref<ExamCandidatePage>({
+  items: [],
+  total: 0,
+  pageNumber: 1,
+  pageSize: 10,
+  totalPages: 0,
+})
+const candidateSearch = reactive({ keyword: '', pageNumber: 1 })
+const candidateDraft = ref<Map<number, ExamCandidateOption>>(new Map())
 const form = reactive<ExamWritePayload>({
   paperId: 0,
   name: '',
   instructions: '',
+  assignmentMode: 'INDIVIDUAL',
+  classIds: [],
   startAt: '',
   endAt: '',
   durationMinutes: 60,
@@ -95,27 +122,82 @@ async function load(): Promise<void> {
   }
 }
 
-async function loadEditorOptions(): Promise<void> {
-  const [papers, candidates] = await Promise.all([
-    listPapers({ status: 'READY', pageNumber: 1, pageSize: 100 }),
-    searchExamCandidates(),
-  ])
-  readyPapers.value = papers.items
-  candidateOptions.value = candidates
+async function loadPaperOptions(): Promise<void> {
+  paperPickerLoading.value = true
+  try {
+    paperPage.value = await listPapers({
+      status: 'READY',
+      keyword: paperSearch.keyword.trim() || undefined,
+      pageNumber: paperSearch.pageNumber,
+      pageSize: 10,
+    })
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '试卷搜索失败')
+  } finally {
+    paperPickerLoading.value = false
+  }
 }
 
-async function searchCandidates(keyword: string): Promise<void> {
-  candidateSearching.value = true
+function openPaperPicker(): void {
+  paperSearch.keyword = ''
+  paperSearch.pageNumber = 1
+  paperPickerVisible.value = true
+  void loadPaperOptions()
+}
+
+function searchPapers(): void {
+  paperSearch.pageNumber = 1
+  void loadPaperOptions()
+}
+
+function choosePaper(paper: ExamPaperSummary): void {
+  selectedPaper.value = paper
+  form.paperId = paper.id
+  paperPickerVisible.value = false
+}
+
+async function loadCandidateOptions(): Promise<void> {
+  candidatePickerLoading.value = true
   try {
-    const result = await searchExamCandidates(keyword)
-    const selected = candidateOptions.value.filter((item) => form.candidateUserIds.includes(item.id))
-    const merged = new Map([...selected, ...result].map((item) => [item.id, item]))
-    candidateOptions.value = [...merged.values()]
+    candidatePage.value = await searchExamCandidatePage({
+      keyword: candidateSearch.keyword.trim() || undefined,
+      pageNumber: candidateSearch.pageNumber,
+      pageSize: 10,
+    })
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '考生搜索失败')
   } finally {
-    candidateSearching.value = false
+    candidatePickerLoading.value = false
   }
+}
+
+function openCandidatePicker(): void {
+  candidateDraft.value = new Map(selectedCandidates.value.map((item) => [item.id, item]))
+  candidateSearch.keyword = ''
+  candidateSearch.pageNumber = 1
+  candidatePickerVisible.value = true
+  void loadCandidateOptions()
+}
+
+function searchCandidateOptions(): void {
+  candidateSearch.pageNumber = 1
+  void loadCandidateOptions()
+}
+
+function toggleCandidate(candidate: ExamCandidateOption, checked: boolean): void {
+  if (checked) candidateDraft.value.set(candidate.id, candidate)
+  else candidateDraft.value.delete(candidate.id)
+}
+
+function confirmCandidates(): void {
+  selectedCandidates.value = [...candidateDraft.value.values()]
+  form.candidateUserIds = selectedCandidates.value.map((candidate) => candidate.id)
+  candidatePickerVisible.value = false
+}
+
+function removeSelectedCandidate(userId: number): void {
+  selectedCandidates.value = selectedCandidates.value.filter((candidate) => candidate.id !== userId)
+  form.candidateUserIds = selectedCandidates.value.map((candidate) => candidate.id)
 }
 
 async function openEditor(exam?: ExamSummary): Promise<void> {
@@ -125,6 +207,8 @@ async function openEditor(exam?: ExamSummary): Promise<void> {
   form.paperId = exam?.paperId ?? 0
   form.name = exam?.name ?? ''
   form.instructions = ''
+  form.assignmentMode = exam?.assignmentMode ?? 'INDIVIDUAL'
+  form.classIds = []
   form.startAt = exam?.startAt ?? localDateTime(60)
   form.endAt = exam?.endAt ?? localDateTime(180)
   form.durationMinutes = exam?.durationMinutes ?? 60
@@ -132,21 +216,21 @@ async function openEditor(exam?: ExamSummary): Promise<void> {
   form.showResultImmediately = exam?.showResultImmediately ?? false
   form.showAnswerAfterFinish = exam?.showAnswerAfterFinish ?? true
   form.candidateUserIds = []
+  selectedPaper.value = undefined
+  selectedCandidates.value = []
   try {
-    await loadEditorOptions()
     if (exam) {
       const detail = await getPublisherExam(exam.id)
       form.instructions = detail.instructions ?? ''
-      form.candidateUserIds = detail.candidates.map((candidate) => candidate.userId)
-      const existing = detail.candidates.map((candidate) => ({
+      form.assignmentMode = detail.exam.assignmentMode ?? 'INDIVIDUAL'
+      form.classIds = [...(detail.classIds ?? [])]
+      selectedPaper.value = detail.paper
+      selectedCandidates.value = detail.candidates.map((candidate) => ({
         id: candidate.userId,
         username: candidate.username,
         nickname: candidate.nickname,
       }))
-      const merged = new Map([...existing, ...candidateOptions.value].map((item) => [item.id, item]))
-      candidateOptions.value = [...merged.values()]
-    } else if (readyPapers.value.length) {
-      form.paperId = readyPapers.value[0]!.id
+      form.candidateUserIds = selectedCandidates.value.map((candidate) => candidate.id)
     }
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '考试编辑数据加载失败')
@@ -161,9 +245,10 @@ async function save(): Promise<void> {
     !form.name.trim() ||
     !form.startAt ||
     !form.endAt ||
-    form.candidateUserIds.length === 0
+    (form.assignmentMode === 'INDIVIDUAL' && form.candidateUserIds.length === 0) ||
+    (form.assignmentMode === 'CLASS' && form.classIds.length === 0)
   ) {
-    ElMessage.warning('请完整填写试卷、考试名称、时间并指定至少一名考生')
+    ElMessage.warning('请完整填写试卷、考试名称、时间和发放对象')
     return
   }
   saving.value = true
@@ -175,6 +260,7 @@ async function save(): Promise<void> {
       durationMinutes: Number(form.durationMinutes),
       passingScore: Number(form.passingScore),
       candidateUserIds: [...form.candidateUserIds],
+      classIds: [...form.classIds],
     }
     if (editingExamId.value) await updateExam(editingExamId.value, payload)
     else await createExam(payload)
@@ -272,13 +358,16 @@ onMounted(load)
             </template>
           </el-table-column>
           <el-table-column label="时长" width="90"><template #default="{ row }">{{ row.durationMinutes }} 分钟</template></el-table-column>
+          <el-table-column label="考生范围" width="105">
+            <template #default="{ row }">{{ row.assignmentMode === 'CLASS' ? '指定班级' : '指定考生' }}</template>
+          </el-table-column>
           <el-table-column label="及格分" width="90"><template #default="{ row }">{{ Number(row.passingScore).toFixed(2) }}</template></el-table-column>
-          <el-table-column label="状态" width="105">
+          <el-table-column label="状态" width="120">
             <template #default="{ row }">
               <el-tag :type="statusTagType(row.status)">{{ statusLabels[row.status as ExamStatus] }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="300" fixed="right">
+          <el-table-column label="操作" width="300">
             <template #default="{ row }">
               <el-button v-if="row.status === 'DRAFT'" link type="primary" :icon="Edit" @click="openEditor(row as ExamSummary)">编辑</el-button>
               <el-button v-if="row.status === 'DRAFT'" link type="success" :icon="Promotion" @click="publish(row as ExamSummary)">发布</el-button>
@@ -318,15 +407,15 @@ onMounted(load)
           <el-form-item label="考试名称" required>
             <el-input v-model="form.name" maxlength="200" />
           </el-form-item>
-          <el-form-item label="固定试卷" required>
-            <el-select v-model="form.paperId" placeholder="请选择已完成组卷的试卷">
-              <el-option
-                v-for="paper in readyPapers"
-                :key="paper.id"
-                :label="`${paper.name}（${paper.questionCount}题 / ${paper.totalScore}分）`"
-                :value="paper.id"
-              />
-            </el-select>
+          <el-form-item label="试卷" required>
+            <button type="button" class="picker-trigger" @click="openPaperPicker">
+              <template v-if="selectedPaper">
+                <strong>{{ selectedPaper.name }}</strong>
+                <span>{{ selectedPaper.questionCount }} 题 · {{ Number(selectedPaper.totalScore).toFixed(2) }} 分</span>
+              </template>
+              <span v-else>请选择可用试卷</span>
+              <b>选择</b>
+            </button>
           </el-form-item>
           <el-form-item label="开始时间" required>
             <el-date-picker v-model="form.startAt" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" />
@@ -341,24 +430,32 @@ onMounted(load)
             <el-input-number v-model="form.passingScore" :min="0" :precision="2" />
           </el-form-item>
         </div>
-        <el-form-item label="指定考生" required>
-          <el-select
-            v-model="form.candidateUserIds"
-            multiple
-            filterable
-            remote
-            reserve-keyword
-            :remote-method="searchCandidates"
-            :loading="candidateSearching"
-            placeholder="输入用户名或昵称搜索，可多选"
-          >
-            <el-option
-              v-for="candidate in candidateOptions"
-              :key="candidate.id"
-              :label="`${candidate.nickname}（${candidate.username}）`"
-              :value="candidate.id"
-            />
-          </el-select>
+        <el-form-item label="考试对象" required>
+          <el-radio-group v-model="form.assignmentMode">
+            <el-radio-button value="INDIVIDUAL">指定考生</el-radio-button>
+            <el-radio-button value="CLASS">指定班级</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="form.assignmentMode === 'INDIVIDUAL'" label="指定考生" required>
+          <div class="candidate-field">
+            <el-button type="primary" plain @click="openCandidatePicker">
+              选择考生（已选 {{ selectedCandidates.length }} 人）
+            </el-button>
+            <div v-if="selectedCandidates.length" class="selected-candidates">
+              <el-tag
+                v-for="candidate in selectedCandidates"
+                :key="candidate.id"
+                closable
+                @close="removeSelectedCandidate(candidate.id)"
+              >
+                {{ candidate.nickname }}（{{ candidate.username }}）
+              </el-tag>
+            </div>
+            <span v-else class="picker-placeholder">尚未选择考生</span>
+          </div>
+        </el-form-item>
+        <el-form-item v-else label="指定班级" required>
+          <ClassPickerDialog v-model="form.classIds" />
         </el-form-item>
         <el-form-item label="考试说明">
           <el-input v-model="form.instructions" type="textarea" :rows="4" maxlength="5000" />
@@ -373,6 +470,89 @@ onMounted(load)
         <el-button type="primary" :loading="saving" @click="save">保存草稿</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="paperPickerVisible" title="选择试卷" width="min(820px, 94vw)" top="7vh">
+      <div class="picker-search">
+        <el-input
+          v-model="paperSearch.keyword"
+          clearable
+          placeholder="搜索试卷名称"
+          @keyup.enter="searchPapers"
+        />
+        <el-button type="primary" @click="searchPapers">查询</el-button>
+      </div>
+      <el-table v-loading="paperPickerLoading" :data="paperPage.items" height="430">
+        <el-table-column label="试卷" min-width="300">
+          <template #default="{ row }">
+            <strong>{{ row.name }}</strong>
+            <small>{{ row.description || '暂无说明' }}</small>
+          </template>
+        </el-table-column>
+        <el-table-column prop="questionCount" label="题目数" width="90" />
+        <el-table-column label="总分" width="100">
+          <template #default="{ row }">{{ Number(row.totalScore).toFixed(2) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="90">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="choosePaper(row as ExamPaperSummary)">选择</el-button>
+          </template>
+        </el-table-column>
+        <template #empty><el-empty description="没有匹配的可用试卷" /></template>
+      </el-table>
+      <el-pagination
+        v-if="paperPage.total > paperPage.pageSize"
+        v-model:current-page="paperSearch.pageNumber"
+        class="picker-pagination"
+        layout="total, prev, pager, next"
+        :page-size="paperPage.pageSize"
+        :total="paperPage.total"
+        @current-change="loadPaperOptions"
+      />
+    </el-dialog>
+
+    <el-dialog
+      v-model="candidatePickerVisible"
+      title="选择考生"
+      width="min(820px, 94vw)"
+      top="7vh"
+    >
+      <div class="picker-search">
+        <el-input
+          v-model="candidateSearch.keyword"
+          clearable
+          placeholder="搜索用户名或昵称"
+          @keyup.enter="searchCandidateOptions"
+        />
+        <el-button type="primary" @click="searchCandidateOptions">查询</el-button>
+      </div>
+      <div class="picker-selection-count">当前已选择 {{ candidateDraft.size }} 人，切换搜索或页码不会丢失选择。</div>
+      <el-table v-loading="candidatePickerLoading" :data="candidatePage.items" height="400">
+        <el-table-column label="选择" width="75">
+          <template #default="{ row }">
+            <el-checkbox
+              :model-value="candidateDraft.has(row.id)"
+              @change="toggleCandidate(row as ExamCandidateOption, Boolean($event))"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column prop="username" label="用户名" min-width="220" />
+        <el-table-column prop="nickname" label="昵称" min-width="220" />
+        <template #empty><el-empty description="没有匹配的用户" /></template>
+      </el-table>
+      <el-pagination
+        v-if="candidatePage.total > candidatePage.pageSize"
+        v-model:current-page="candidateSearch.pageNumber"
+        class="picker-pagination"
+        layout="total, prev, pager, next"
+        :page-size="candidatePage.pageSize"
+        :total="candidatePage.total"
+        @current-change="loadCandidateOptions"
+      />
+      <template #footer>
+        <el-button @click="candidatePickerVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmCandidates">确认选择</el-button>
+      </template>
+    </el-dialog>
   </section>
 </template>
 
@@ -384,7 +564,11 @@ onMounted(load)
 .pagination { justify-content: center; margin-top: 24px; }
 .form-grid { display: grid; gap: 0 18px; grid-template-columns: 1fr 1fr; }
 .form-grid .el-select, .form-grid .el-date-editor, .form-grid .el-input-number, .el-form-item > .el-select { width: 100%; }
+.picker-trigger { display: grid; width: 100%; min-height: 40px; border: 1px solid var(--lp-border); border-radius: 8px; align-items: center; gap: 2px 10px; background: #fff; cursor: pointer; grid-template-columns: minmax(0, 1fr) auto; padding: 7px 11px; text-align: left; }
+.picker-trigger:hover { border-color: var(--lp-primary); }.picker-trigger strong, .picker-trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.picker-trigger span { color: var(--lp-text-secondary); font-size: 12px; }.picker-trigger b { color: var(--lp-primary); font-size: 14px; grid-column: 2; grid-row: 1 / span 2; }
+.candidate-field { width: 100%; }.selected-candidates { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }.picker-placeholder { display: block; margin-top: 8px; color: var(--lp-text-secondary); font-size: 13px; }
+.picker-search { display: grid; gap: 10px; margin-bottom: 14px; grid-template-columns: 1fr auto; }.picker-pagination { justify-content: center; margin-top: 16px; }.picker-selection-count { margin: -2px 0 12px; color: var(--lp-text-secondary); font-size: 13px; }
 .rule-switches { display: flex; flex-wrap: wrap; gap: 28px; border-radius: 10px; background: #f7f9fc; padding: 14px 16px; }
 .grading-link { margin-left: 12px; color: var(--lp-primary); font-size: 14px; font-weight: 700; }
-@media (max-width: 720px) { .toolbar, .form-grid { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .toolbar, .form-grid, .picker-search { grid-template-columns: 1fr; } }
 </style>

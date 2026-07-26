@@ -18,8 +18,10 @@ import java.util.Optional;
 public interface LearningContentMapper {
     String COLUMNS = """
             lc.id, lc.publisher_id, publisher.nickname AS publisher_name,
-            lc.category_id, lc.title, lc.summary, lc.content_type, lc.article_body,
-            lc.cover_file_id, lc.is_free AS free, lc.price, lc.status, lc.rejection_reason,
+            lc.category_id, category.name AS category_name,
+            lc.title, lc.summary, lc.content_type, lc.article_body,
+            lc.cover_file_id, lc.distribution_mode, lc.is_free AS free, lc.price,
+            lc.status, lc.rejection_reason,
             lc.view_count, lc.like_count, lc.favorite_count, lc.comment_count,
             lc.submitted_at, lc.published_at, lc.created_at, lc.updated_at, lc.deleted
             """;
@@ -29,6 +31,7 @@ public interface LearningContentMapper {
             """ + COLUMNS + """
             FROM learning_content lc
             JOIN `user` publisher ON publisher.id = lc.publisher_id AND publisher.deleted = 0
+            LEFT JOIN content_category category ON category.id = lc.category_id
             WHERE lc.id = #{id} AND lc.deleted = 0
             """)
     Optional<LearningContent> findById(Long id);
@@ -36,10 +39,10 @@ public interface LearningContentMapper {
     @Insert("""
             INSERT INTO learning_content (
                 publisher_id, category_id, title, summary, content_type, article_body,
-                is_free, price, status
+                distribution_mode, is_free, price, status
             ) VALUES (
                 #{publisherId}, #{categoryId}, #{title}, #{summary}, #{contentType}, #{articleBody},
-                #{free}, #{price}, #{status}
+                #{distributionMode}, #{free}, #{price}, #{status}
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
@@ -52,6 +55,7 @@ public interface LearningContentMapper {
                 summary = #{summary},
                 content_type = #{contentType},
                 article_body = #{articleBody},
+                distribution_mode = #{distributionMode},
                 is_free = #{free},
                 price = #{price},
                 status = #{status},
@@ -162,7 +166,7 @@ public interface LearningContentMapper {
             <script>
             SELECT COUNT(*)
             FROM learning_content
-            WHERE deleted = 0 AND status = 'PUBLISHED'
+            WHERE deleted = 0 AND status = 'PUBLISHED' AND distribution_mode = 'PUBLIC'
             <if test='keyword != null'>AND (title LIKE CONCAT('%', #{keyword}, '%') OR summary LIKE CONCAT('%', #{keyword}, '%'))</if>
             <if test='categoryId != null'>AND category_id = #{categoryId}</if>
             <if test='contentType != null'>AND content_type = #{contentType}</if>
@@ -182,7 +186,8 @@ public interface LearningContentMapper {
             """ + COLUMNS + """
             FROM learning_content lc
             JOIN `user` publisher ON publisher.id = lc.publisher_id AND publisher.deleted = 0
-            WHERE lc.deleted = 0 AND lc.status = 'PUBLISHED'
+            LEFT JOIN content_category category ON category.id = lc.category_id
+            WHERE lc.deleted = 0 AND lc.status = 'PUBLISHED' AND lc.distribution_mode = 'PUBLIC'
             <if test='keyword != null'>AND (lc.title LIKE CONCAT('%', #{keyword}, '%') OR lc.summary LIKE CONCAT('%', #{keyword}, '%'))</if>
             <if test='categoryId != null'>AND lc.category_id = #{categoryId}</if>
             <if test='contentType != null'>AND lc.content_type = #{contentType}</if>
@@ -196,6 +201,96 @@ public interface LearningContentMapper {
             @Param("categoryId") Long categoryId,
             @Param("contentType") ContentType contentType,
             @Param("free") Boolean free,
+            @Param("offset") long offset,
+            @Param("limit") int limit
+    );
+
+    @Select("""
+            SELECT COUNT(*)
+            FROM learning_content
+            WHERE publisher_id = #{publisherId}
+              AND deleted = 0
+              AND status = 'PUBLISHED'
+              AND distribution_mode = 'PUBLIC'
+            """)
+    long countPublicByPublisher(Long publisherId);
+
+    @Select("""
+            SELECT
+            """ + COLUMNS + """
+            FROM learning_content lc
+            JOIN `user` publisher ON publisher.id = lc.publisher_id AND publisher.deleted = 0
+            LEFT JOIN content_category category ON category.id = lc.category_id
+            WHERE lc.publisher_id = #{publisherId}
+              AND lc.deleted = 0
+              AND lc.status = 'PUBLISHED'
+              AND lc.distribution_mode = 'PUBLIC'
+            ORDER BY lc.published_at DESC, lc.id DESC
+            LIMIT #{limit} OFFSET #{offset}
+            """)
+    List<LearningContent> findPublicByPublisher(
+            @Param("publisherId") Long publisherId,
+            @Param("offset") long offset,
+            @Param("limit") int limit
+    );
+
+    @Select("""
+            SELECT COUNT(*) AS content_count,
+                   COALESCE(SUM(view_count), 0) AS view_count,
+                   COALESCE(SUM(like_count), 0) AS like_count,
+                   COALESCE(SUM(favorite_count), 0) AS favorite_count
+            FROM learning_content
+            WHERE publisher_id = #{publisherId}
+              AND deleted = 0
+              AND status = 'PUBLISHED'
+              AND distribution_mode = 'PUBLIC'
+            """)
+    com.learningplatform.content.domain.ContentPublicationStats publicationStats(Long publisherId);
+
+    @Select("""
+            <script>
+            SELECT COUNT(*)
+            FROM learning_content lc
+            JOIN `user` publisher ON publisher.id = lc.publisher_id AND publisher.deleted = 0
+            WHERE lc.deleted = 0 AND lc.status = 'PUBLISHED' AND lc.distribution_mode = 'PUBLIC'
+            <if test='titleKeyword != null'>
+              AND lc.title LIKE CONCAT('%', #{titleKeyword}, '%')
+            </if>
+            <if test='publisherKeyword != null'>
+              AND publisher.nickname LIKE CONCAT('%', #{publisherKeyword}, '%')
+            </if>
+            <if test='excludeContentId != null'>AND lc.id != #{excludeContentId}</if>
+            </script>
+            """)
+    long countReferenceCandidates(
+            @Param("titleKeyword") String titleKeyword,
+            @Param("publisherKeyword") String publisherKeyword,
+            @Param("excludeContentId") Long excludeContentId
+    );
+
+    @Select("""
+            <script>
+            SELECT
+            """ + COLUMNS + """
+            FROM learning_content lc
+            JOIN `user` publisher ON publisher.id = lc.publisher_id AND publisher.deleted = 0
+            LEFT JOIN content_category category ON category.id = lc.category_id
+            WHERE lc.deleted = 0 AND lc.status = 'PUBLISHED' AND lc.distribution_mode = 'PUBLIC'
+            <if test='titleKeyword != null'>
+              AND lc.title LIKE CONCAT('%', #{titleKeyword}, '%')
+            </if>
+            <if test='publisherKeyword != null'>
+              AND publisher.nickname LIKE CONCAT('%', #{publisherKeyword}, '%')
+            </if>
+            <if test='excludeContentId != null'>AND lc.id != #{excludeContentId}</if>
+            ORDER BY lc.published_at DESC, lc.id DESC
+            LIMIT #{limit} OFFSET #{offset}
+            </script>
+            """)
+    List<LearningContent> findReferenceCandidates(
+            @Param("titleKeyword") String titleKeyword,
+            @Param("publisherKeyword") String publisherKeyword,
+            @Param("excludeContentId") Long excludeContentId,
             @Param("offset") long offset,
             @Param("limit") int limit
     );
@@ -221,6 +316,7 @@ public interface LearningContentMapper {
             """ + COLUMNS + """
             FROM learning_content lc
             JOIN `user` publisher ON publisher.id = lc.publisher_id AND publisher.deleted = 0
+            LEFT JOIN content_category category ON category.id = lc.category_id
             WHERE lc.deleted = 0 AND lc.publisher_id = #{publisherId}
             <if test='status != null'>AND lc.status = #{status}</if>
             <if test='keyword != null'>AND lc.title LIKE CONCAT('%', #{keyword}, '%')</if>
@@ -256,6 +352,7 @@ public interface LearningContentMapper {
             """ + COLUMNS + """
             FROM learning_content lc
             JOIN `user` publisher ON publisher.id = lc.publisher_id AND publisher.deleted = 0
+            LEFT JOIN content_category category ON category.id = lc.category_id
             WHERE lc.deleted = 0
             <if test='status != null'>AND lc.status = #{status}</if>
             <if test='keyword != null'>AND lc.title LIKE CONCAT('%', #{keyword}, '%')</if>

@@ -35,6 +35,7 @@ function rule(
 
 export const UPLOAD_RULES: Record<ContentFileRole, UploadRule> = {
   COVER: rule('COVER', '封面', ['jpg', 'jpeg', 'png', 'webp'], 10),
+  INLINE_IMAGE: rule('INLINE_IMAGE', '正文图片', ['jpg', 'jpeg', 'png', 'webp'], 10),
   CONTENT: rule(
     'CONTENT',
     '正文文件',

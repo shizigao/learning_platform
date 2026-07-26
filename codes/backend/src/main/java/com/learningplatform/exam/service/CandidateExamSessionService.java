@@ -51,6 +51,7 @@ public class CandidateExamSessionService {
     public CandidateExamOverviewResponse overview(Long examId, Long userId) {
         LocalDateTime now = now();
         Exam exam = examService.getRequired(examId);
+        examService.ensureCandidateAccess(exam, userId);
         ExamCandidate candidate = getCandidate(examId, userId);
         ExamPaper paper = paperService.getRequired(exam.getPaperId());
         ExamAttempt attempt = attemptMapper.findFirst(examId, userId).orElse(null);
@@ -65,6 +66,7 @@ public class CandidateExamSessionService {
     public ExamEligibilityResponse eligibility(Long examId, Long userId) {
         LocalDateTime now = now();
         Exam exam = examService.getRequired(examId);
+        examService.ensureCandidateAccess(exam, userId);
         ExamCandidate candidate = getCandidate(examId, userId);
         ExamAttempt attempt = attemptMapper.findFirst(examId, userId).orElse(null);
         return eligibility(exam, candidate, attempt, now);
@@ -73,6 +75,7 @@ public class CandidateExamSessionService {
     @Transactional
     public ExamStartResponse start(Long examId, Long userId) {
         Exam exam = examService.getRequired(examId);
+        examService.ensureCandidateAccess(exam, userId);
         ExamCandidate candidate = candidateMapper.findOneForUpdate(examId, userId)
                 .orElseThrow(() -> forbidden("你不是本场考试的指定考生"));
         LocalDateTime now = now();
@@ -112,6 +115,7 @@ public class CandidateExamSessionService {
     @Transactional
     public ExamStartResponse resume(Long examId, Long userId) {
         Exam exam = examService.getRequired(examId);
+        examService.ensureCandidateAccess(exam, userId);
         getCandidate(examId, userId);
         LocalDateTime now = now();
         ExamAttempt attempt = attemptMapper.findFirst(examId, userId)

@@ -2,6 +2,10 @@ package com.learningplatform.exam.web;
 
 import com.learningplatform.auth.security.AuthenticatedUserPrincipal;
 import com.learningplatform.auth.security.AuthenticationPrincipalResolver;
+import com.learningplatform.ai.dto.ExamAiAnalysisGenerateRequest;
+import com.learningplatform.ai.dto.ExamAiAnalysisPageResponse;
+import com.learningplatform.ai.dto.ExamAiAnalysisResponse;
+import com.learningplatform.ai.service.ExamAiAnalysisService;
 import com.learningplatform.common.api.ApiResponse;
 import com.learningplatform.exam.dto.ExamGradingAttemptResponse;
 import com.learningplatform.exam.dto.ExamGradingDetailResponse;
@@ -29,13 +33,16 @@ import java.util.List;
 public class PublisherExamGradingController {
     private final ExamGradingService gradingService;
     private final ExamStatisticsService statisticsService;
+    private final ExamAiAnalysisService aiAnalysisService;
 
     public PublisherExamGradingController(
             ExamGradingService gradingService,
-            ExamStatisticsService statisticsService
+            ExamStatisticsService statisticsService,
+            ExamAiAnalysisService aiAnalysisService
     ) {
         this.gradingService = gradingService;
         this.statisticsService = statisticsService;
+        this.aiAnalysisService = aiAnalysisService;
     }
 
     @GetMapping("/attempts")
@@ -110,6 +117,29 @@ public class PublisherExamGradingController {
                 examId,
                 principal.userId(),
                 isAdmin(principal)
+        ));
+    }
+
+    @GetMapping("/ai-analysis")
+    public ApiResponse<ExamAiAnalysisPageResponse> aiAnalysis(
+            Authentication authentication,
+            @PathVariable Long examId
+    ) {
+        Long userId = principal(authentication).userId();
+        return ApiResponse.success(aiAnalysisService.overallPage(examId, userId));
+    }
+
+    @PostMapping("/ai-analysis")
+    public ApiResponse<ExamAiAnalysisResponse> generateAiAnalysis(
+            Authentication authentication,
+            @PathVariable Long examId,
+            @Valid @RequestBody ExamAiAnalysisGenerateRequest request
+    ) {
+        Long userId = principal(authentication).userId();
+        return ApiResponse.success(aiAnalysisService.generateOverall(
+                examId,
+                userId,
+                request.requestId()
         ));
     }
 

@@ -1,4 +1,5 @@
 import type { PageResult } from '@/types/api'
+import type { AiTask } from '@/types/ai'
 
 export type QuestionType =
   | 'SINGLE_CHOICE'
@@ -9,6 +10,7 @@ export type QuestionType =
 export type QuestionStatus = 'ACTIVE' | 'ARCHIVED'
 export type ExamPaperStatus = 'DRAFT' | 'READY' | 'ARCHIVED'
 export type ExamStatus = 'DRAFT' | 'PUBLISHED' | 'ONGOING' | 'FINISHED' | 'CANCELLED'
+export type ExamAssignmentMode = 'INDIVIDUAL' | 'CLASS'
 export type ExamCandidateStatus = 'ASSIGNED' | 'STARTED' | 'SUBMITTED' | 'ABSENT'
 export type ExamAttemptStatus = 'IN_PROGRESS' | 'SUBMITTED' | 'GRADING' | 'COMPLETED'
 
@@ -127,11 +129,14 @@ export interface ExamCandidateOption {
   nickname: string
 }
 
+export type ExamCandidatePage = PageResult<ExamCandidateOption>
+
 export interface ExamSummary {
   id: number
   publisherId: number
   paperId: number
   name: string
+  assignmentMode: ExamAssignmentMode
   startAt: string
   endAt: string
   durationMinutes: number
@@ -149,12 +154,15 @@ export interface ExamManagement {
   instructions?: string
   paper: ExamPaperSummary
   candidates: ExamCandidate[]
+  classIds: number[]
 }
 
 export interface ExamWritePayload {
   paperId: number
   name: string
   instructions: string
+  assignmentMode: ExamAssignmentMode
+  classIds: number[]
   startAt: string
   endAt: string
   durationMinutes: number
@@ -335,4 +343,27 @@ export interface ExamStatistics {
   passedCount: number
   passRate: number
   questions: ExamQuestionStatistics[]
+}
+
+export type ExamAiAnalysisScope = 'OVERALL' | 'PERSONAL'
+
+export interface ExamAiAnalysis {
+  id: number
+  task: AiTask
+  examId: number
+  attemptId?: number
+  scope: ExamAiAnalysisScope
+  reportMarkdown: string
+  inputSnapshotHash: string
+  createdAt: string
+}
+
+export interface ExamAiAnalysisPage {
+  examId: number
+  examName: string
+  scope: ExamAiAnalysisScope
+  eligible: boolean
+  ineligibleReason?: string
+  quotaRemaining: number
+  reports: ExamAiAnalysis[]
 }

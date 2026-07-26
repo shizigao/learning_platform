@@ -36,6 +36,24 @@ class FileUploadValidatorTests {
     }
 
     @Test
+    void acceptsInlineMarkdownImage() {
+        ValidatedUploadFile file = validator.validate(request(
+                ContentFileRole.INLINE_IMAGE,
+                "diagram.webp",
+                "image/webp",
+                1024,
+                0,
+                0,
+                7,
+                7,
+                false
+        ));
+
+        assertThat(file.fileRole()).isEqualTo(ContentFileRole.INLINE_IMAGE);
+        assertThat(file.extension()).isEqualTo("webp");
+    }
+
+    @Test
     void rejectsExtensionAndMimeMismatch() {
         assertBadRequest(request(
                 ContentFileRole.COVER,

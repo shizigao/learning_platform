@@ -36,7 +36,11 @@ public class ContentInteractionController {
             @PathVariable Long contentId
     ) {
         AuthenticatedUserPrincipal principal = principal(authentication);
-        return ApiResponse.success(interactionService.state(contentId, principal.userId()));
+        return ApiResponse.success(interactionService.state(
+                contentId,
+                principal.userId(),
+                isAdmin(principal)
+        ));
     }
 
     @PostMapping("/like")
@@ -57,9 +61,11 @@ public class ContentInteractionController {
             Authentication authentication,
             @PathVariable Long contentId
     ) {
+        AuthenticatedUserPrincipal principal = principal(authentication);
         return ApiResponse.success(interactionService.unlike(
                 contentId,
-                principal(authentication).userId()
+                principal.userId(),
+                isAdmin(principal)
         ));
     }
 
@@ -68,9 +74,11 @@ public class ContentInteractionController {
             Authentication authentication,
             @PathVariable Long contentId
     ) {
+        AuthenticatedUserPrincipal principal = principal(authentication);
         return ApiResponse.success(interactionService.favorite(
                 contentId,
-                principal(authentication).userId()
+                principal.userId(),
+                isAdmin(principal)
         ));
     }
 
@@ -79,9 +87,11 @@ public class ContentInteractionController {
             Authentication authentication,
             @PathVariable Long contentId
     ) {
+        AuthenticatedUserPrincipal principal = principal(authentication);
         return ApiResponse.success(interactionService.unfavorite(
                 contentId,
-                principal(authentication).userId()
+                principal.userId(),
+                isAdmin(principal)
         ));
     }
 
@@ -102,10 +112,17 @@ public class ContentInteractionController {
 
     @GetMapping("/comments")
     public ApiResponse<PageResult<ContentCommentResponse>> comments(
+            Authentication authentication,
             @PathVariable Long contentId,
             @Valid @ModelAttribute PageQuery query
     ) {
-        return ApiResponse.success(interactionService.comments(contentId, query));
+        AuthenticatedUserPrincipal principal = principal(authentication);
+        return ApiResponse.success(interactionService.comments(
+                contentId,
+                principal.userId(),
+                isAdmin(principal),
+                query
+        ));
     }
 
     private AuthenticatedUserPrincipal principal(Authentication authentication) {

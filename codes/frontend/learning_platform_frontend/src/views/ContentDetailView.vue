@@ -16,6 +16,7 @@ import {
   unfavoriteContent,
   unlikeContent,
 } from '@/api/content'
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import ThumbUpIcon from '@/components/ThumbUpIcon.vue'
 import type { CommentPage, ContentDetail, ContentReaction } from '@/types/content'
 
@@ -29,7 +30,11 @@ const reaction = ref<ContentReaction>({ liked: false, favorited: false, likeCoun
 const comments = ref<CommentPage>({ items: [], total: 0, pageNumber: 1, pageSize: 20, totalPages: 0 })
 const commentBody = ref('')
 const priceText = computed(() =>
-  detail.value?.isFree ? '免费学习' : `¥${Number(detail.value?.price ?? 0).toFixed(2)}`,
+  detail.value?.distributionMode === 'CLASS'
+    ? '班级资料'
+    : detail.value?.isFree
+      ? '免费学习'
+      : `¥${Number(detail.value?.price ?? 0).toFixed(2)}`,
 )
 
 async function load(): Promise<void> {
@@ -114,19 +119,35 @@ onMounted(load)
       <div class="detail-layout">
         <article class="main-card">
           <div class="badges">
-            <el-tag>{{ detail.contentType }}</el-tag>
+            <el-tag>{{ detail.categoryName || '学习资料' }}</el-tag>
             <el-tag :type="detail.isFree ? 'success' : 'warning'">{{ priceText }}</el-tag>
           </div>
           <h1>{{ detail.title }}</h1>
           <p class="summary">{{ detail.summary }}</p>
+          <RouterLink :to="`/users/${detail.publisherId}`" class="publisher-card">
+            <el-avatar :size="46" :src="detail.publisherAvatarUrl">
+              {{ (detail.publisherName || detail.publisherUsername || '用').slice(0, 1) }}
+            </el-avatar>
+            <span>
+              <small>资料发布者</small>
+              <strong>{{ detail.publisherName || `用户 ${detail.publisherId}` }}</strong>
+              <em v-if="detail.publisherUsername">@{{ detail.publisherUsername }}</em>
+            </span>
+          </RouterLink>
           <div class="metrics">
-            <span>发布者：{{ detail.publisherName || `用户 ${detail.publisherId}` }}</span>
             <span>{{ detail.viewCount }} 浏览</span>
             <span>{{ reaction.likeCount }} 点赞</span>
+            <span>{{ reaction.favoriteCount }} 收藏</span>
             <span>{{ comments.total }} 评论</span>
           </div>
 
-          <div v-if="detail.hasAccess && detail.articleBody" class="article-preview">{{ detail.articleBody }}</div>
+          <MarkdownRenderer
+            v-if="detail.hasAccess && detail.articleBody"
+            class="article-preview"
+            :source="detail.articleBody"
+            :content-id="contentId"
+            :content-reference-navigation-enabled="false"
+          />
           <div v-else-if="!detail.hasAccess" class="locked-panel">
             <el-icon><Lock /></el-icon>
             <div><strong>这是付费学习资料</strong><p>完成购买后即可查看完整正文和下载文件。</p></div>
@@ -201,8 +222,9 @@ onMounted(load)
 .badges { display: flex; gap: 8px; }
 h1 { margin: 18px 0 12px; font-size: clamp(28px, 4vw, 40px); letter-spacing: -.03em; }
 .summary { color: var(--lp-text-secondary); font-size: 16px; line-height: 1.8; }
-.metrics { display: flex; gap: 24px; border-bottom: 1px solid var(--lp-border); margin-top: 24px; color: #98a2b3; font-size: 13px; padding-bottom: 24px; }
-.article-preview { margin-top: 28px; font-size: 15px; line-height: 1.9; white-space: pre-wrap; }
+.publisher-card { display: flex; align-items: center; width: fit-content; gap: 12px; border: 1px solid var(--lp-border); border-radius: 14px; margin-top: 22px; color: inherit; background: #f8faff; padding: 11px 14px; }.publisher-card:hover { border-color: #b7d0ff; }.publisher-card span, .publisher-card small, .publisher-card em { display: block; }.publisher-card small, .publisher-card em { color: var(--lp-text-secondary); font-size: 11px; font-style: normal; }.publisher-card strong { display: block; margin: 3px 0; }
+.metrics { display: flex; flex-wrap: wrap; gap: 24px; border-bottom: 1px solid var(--lp-border); margin-top: 18px; color: #98a2b3; font-size: 13px; padding-bottom: 24px; }
+.article-preview { margin-top: 28px; font-size: 15px; }
 .locked-panel { display: flex; align-items: center; gap: 16px; border-radius: 14px; margin-top: 26px; color: #92400e; background: #fffbeb; padding: 20px; }
 .locked-panel .el-icon { font-size: 30px; }.locked-panel p { margin: 5px 0 0; font-size: 13px; }
 .action-card { position: sticky; top: 94px; padding: 26px; }

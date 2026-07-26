@@ -1,4 +1,8 @@
-export type AiTaskType = 'SUMMARY' | 'EXPLANATION'
+export type AiTaskType =
+  | 'SUMMARY'
+  | 'EXPLANATION'
+  | 'EXAM_OVERALL_ANALYSIS'
+  | 'EXAM_PERSONAL_ANALYSIS'
 export type AiTaskStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED'
 export type AiMessageRole = 'SYSTEM' | 'USER' | 'ASSISTANT'
 export type AiConversationStatus = 'ACTIVE' | 'ARCHIVED'
@@ -6,7 +10,7 @@ export type AiConversationStatus = 'ACTIVE' | 'ARCHIVED'
 export interface AiTask {
   id: number
   requestId: string
-  contentId: number
+  contentId?: number
   conversationId?: number
   taskType: AiTaskType
   provider: string

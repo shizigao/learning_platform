@@ -45,7 +45,12 @@ const conversations = ref<AiConversation[]>([])
 const activeConversation = ref<AiConversation>()
 const question = ref('')
 const usageRecords = ref<AiUsageRecord[]>([])
-const balances = ref<EntitlementBalances>({ aiQuota: 0, examQuota: 0 })
+const balances = ref<EntitlementBalances>({
+  aiQuota: 0,
+  examQuota: 0,
+  examOverallAiQuota: 0,
+  examPersonalAiQuota: 0,
+})
 const messagesElement = ref<HTMLElement>()
 
 type OperationPhase = 'idle' | 'submitting' | 'generating' | 'success' | 'error'
@@ -388,7 +393,6 @@ onBeforeUnmount(() => {
             :value="item.id"
           >
             <span>{{ item.title }}</span>
-            <small class="option-type">{{ item.contentType }}</small>
           </el-option>
         </el-select>
       </div>
