@@ -1,6 +1,7 @@
 package com.learningplatform.exam.mapper;
 
 import com.learningplatform.exam.domain.ExamResult;
+import com.learningplatform.exam.domain.WrongReviewExam;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
@@ -8,6 +9,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.util.Optional;
+import java.util.List;
 
 @Mapper
 public interface ExamResultMapper {
@@ -40,6 +42,27 @@ public interface ExamResultMapper {
             @org.apache.ibatis.annotations.Param("examId") Long examId,
             @org.apache.ibatis.annotations.Param("userId") Long userId
     );
+
+    @Select("""
+            SELECT r.id AS result_id, r.exam_id, r.attempt_id,
+                   e.name AS exam_name, p.total_score AS full_score,
+                   r.total_score, r.passing_score, r.passed, r.generated_at,
+                   CASE
+                       WHEN e.show_answer_after_finish = TRUE
+                        AND e.end_at <= CURRENT_TIMESTAMP
+                       THEN TRUE ELSE FALSE
+                   END AS answers_visible
+            FROM exam_result r
+            JOIN exam e ON e.id = r.exam_id
+            JOIN exam_paper p ON p.id = e.paper_id
+            WHERE r.user_id = #{userId}
+              AND r.grading_completed = TRUE
+              AND r.visible_to_candidate = TRUE
+              AND e.end_at <= CURRENT_TIMESTAMP
+            ORDER BY r.generated_at DESC, r.id DESC
+            LIMIT 5
+            """)
+    List<WrongReviewExam> findRecentCompletedForWrongReview(Long userId);
 
     @Insert("""
             INSERT INTO exam_result (

@@ -259,6 +259,48 @@ class AiLearningControllerIntegrationTests {
     }
 
     @Test
+    void runsConversationTemplateAndPersistsOnlyTheTemplateLabel() throws Exception {
+        MvcResult created = mockMvc.perform(post(
+                                "/api/ai/contents/{contentId}/conversations",
+                                freeContentId
+                        )
+                        .header(AUTHORIZATION, bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        long conversationId = data(created).path("id").asLong();
+
+        mockMvc.perform(post(
+                                "/api/ai/conversations/{conversationId}/templates",
+                                conversationId
+                        )
+                        .header(AUTHORIZATION, bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "requestId":"quiz-template-request-1",
+                                  "template":"QUIZ_REINFORCEMENT"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.task.taskType").value("EXPLANATION"))
+                .andExpect(jsonPath("$.data.question.content").value("出题巩固"))
+                .andExpect(jsonPath("$.data.answer.role").value("ASSISTANT"));
+
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT content
+                FROM ai_message
+                WHERE conversation_id = ? AND role = 'USER'
+                """,
+                String.class,
+                conversationId
+        )).isEqualTo("出题巩固");
+        assertThat(aiQuota(user.getId())).isEqualTo(19);
+    }
+
+    @Test
     void rejectsAiAccessToUnpurchasedContentAndCrossUserTasks() throws Exception {
         mockMvc.perform(post(
                                 "/api/ai/contents/{contentId}/summaries",

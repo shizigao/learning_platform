@@ -17,6 +17,7 @@ import {
   createAiRequestId,
   createConversation,
   explain,
+  explainWithTemplate,
   generateSummary,
   getConversation,
   getLatestSummary,
@@ -27,7 +28,12 @@ import { listContents } from '@/api/content'
 import { ApiError } from '@/api/http'
 import { getEntitlementBalances } from '@/api/order'
 import SectionPageHeader from '@/components/SectionPageHeader.vue'
-import type { AiConversation, AiSummary, AiUsageRecord } from '@/types/ai'
+import type {
+  AiConversation,
+  AiConversationTemplate,
+  AiSummary,
+  AiUsageRecord,
+} from '@/types/ai'
 import type { ContentSummary } from '@/types/content'
 import type { EntitlementBalances } from '@/types/order'
 
@@ -340,6 +346,48 @@ async function sendQuestion(): Promise<void> {
   }
 }
 
+async function sendTemplate(
+  template: AiConversationTemplate,
+  label: string,
+): Promise<void> {
+  if (sending.value) return
+  if (!hasQuota.value) {
+    setOperationStatus(chatStatus, {
+      phase: 'error',
+      title: `${label}未开始：AI 额度不足`,
+      detail: '请先购买 AI 次数包，成功生成回答后才会扣除额度。',
+    })
+    return
+  }
+  let conversation = activeConversation.value
+  if (!conversation) conversation = await newConversation()
+  if (!conversation) return
+  sending.value = true
+  const stopProgress = beginOperation(chatStatus, label)
+  try {
+    await explainWithTemplate(
+      conversation.id,
+      template,
+      createAiRequestId(template === 'QUIZ_REINFORCEMENT' ? 'quiz' : 'diverge'),
+    )
+    activeConversation.value = await getConversation(conversation.id)
+    conversations.value = await listConversations(conversation.contentId)
+    await loadBalanceAndUsage()
+    setOperationStatus(chatStatus, {
+      phase: 'success',
+      title: `${label}内容已生成并保存`,
+      detail: '本次成功调用已扣除 1 次 AI 额度，可以继续追问。',
+    })
+    await scrollMessagesToBottom()
+  } catch (error) {
+    setOperationStatus(chatStatus, failedOperation(label, error))
+    await loadBalanceAndUsage()
+  } finally {
+    stopProgress()
+    sending.value = false
+  }
+}
+
 function dateTime(value?: string): string {
   return value ? new Date(value).toLocaleString() : '—'
 }
@@ -487,6 +535,25 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <div class="question-box">
+            <div class="template-actions">
+              <span>快捷学习模板</span>
+              <el-button
+                plain
+                type="primary"
+                :disabled="!hasQuota || sending"
+                @click="sendTemplate('QUIZ_REINFORCEMENT', '出题巩固')"
+              >
+                出题巩固
+              </el-button>
+              <el-button
+                plain
+                type="success"
+                :disabled="!hasQuota || sending"
+                @click="sendTemplate('DIVERGENT_THINKING', '发散思维')"
+              >
+                发散思维
+              </el-button>
+            </div>
             <el-input
               v-model="question"
               type="textarea"
@@ -598,6 +665,7 @@ onBeforeUnmount(() => {
 .markdown-body :deep(:first-child) { margin-top: 0; }.markdown-body :deep(:last-child) { margin-bottom: 0; }.markdown-body :deep(p) { margin: .65em 0; }.markdown-body :deep(h1), .markdown-body :deep(h2), .markdown-body :deep(h3), .markdown-body :deep(h4) { margin: 1em 0 .5em; color: var(--lp-text); line-height: 1.4; }.markdown-body :deep(h1) { font-size: 1.35em; }.markdown-body :deep(h2) { font-size: 1.22em; }.markdown-body :deep(h3) { font-size: 1.12em; }.markdown-body :deep(ul), .markdown-body :deep(ol) { margin: .65em 0; padding-left: 1.7em; }.markdown-body :deep(li + li) { margin-top: .25em; }.markdown-body :deep(blockquote) { border-left: 4px solid #93c5fd; margin: .8em 0; color: #475467; background: #e8eef7; padding: .45em .8em; }.markdown-body :deep(code) { border-radius: 5px; color: #b42318; background: #e5e7eb; padding: .12em .35em; font-family: Consolas, "Courier New", monospace; font-size: .9em; }.markdown-body :deep(pre) { overflow-x: auto; border-radius: 9px; margin: .8em 0; color: #e2e8f0; background: #0f172a; padding: 12px 14px; white-space: pre; }.markdown-body :deep(pre code) { color: inherit; background: transparent; padding: 0; }.markdown-body :deep(table) { display: block; overflow-x: auto; width: 100%; border-collapse: collapse; margin: .8em 0; }.markdown-body :deep(th), .markdown-body :deep(td) { border: 1px solid #cbd5e1; padding: 6px 9px; text-align: left; }.markdown-body :deep(th) { background: #e8eef7; }.markdown-body :deep(a) { color: var(--lp-primary); text-decoration: underline; }.markdown-body :deep(hr) { border: 0; border-top: 1px solid #cbd5e1; margin: 1em 0; }
 .pending-message { opacity: .82; }.typing-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; margin-right: 3px; background: var(--lp-primary); animation: typing 1.1s infinite ease-in-out; }.typing-dot:nth-child(2) { animation-delay: .15s; }.typing-dot:nth-child(3) { animation-delay: .3s; }
 .question-box { border-top: 1px solid var(--lp-border); padding: 16px; }.question-box > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; }.question-box small { color: #98a2b3; }
+.question-box > .template-actions { justify-content: flex-start; margin: 0 0 12px; }.template-actions > span { margin-right: auto; color: var(--lp-text-secondary); font-size: 13px; font-weight: 700; }
 .summary-scroll { overflow-y: auto; min-height: 0; flex: 1; padding-bottom: 20px; scrollbar-gutter: stable; }.summary-panel section { margin: 20px; }.summary-panel h3 { margin: 0 0 9px; font-size: 15px; }.summary-panel p, .summary-panel li { color: var(--lp-text-secondary); font-size: 14px; line-height: 1.8; }.summary-panel ol { margin: 0; padding-left: 22px; }.summary-panel .outline { white-space: pre-wrap; }.summary-scroll > small { display: block; margin: 20px; color: #98a2b3; }
 .operation-status { display: flex; align-items: flex-start; gap: 10px; border-bottom: 1px solid #dbeafe; color: #1e40af; background: #eff6ff; padding: 11px 15px; }.operation-status > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }.operation-status strong { font-size: 13px; }.operation-status small { color: inherit; font-size: 12px; line-height: 1.5; }.status-dot { width: 9px; height: 9px; border: 2px solid currentcolor; border-radius: 50%; flex: 0 0 auto; margin-top: 3px; }.operation-status.submitting .status-dot, .operation-status.generating .status-dot { border-right-color: transparent; animation: spin .8s linear infinite; }.operation-status.success { border-color: #bbf7d0; color: #166534; background: #f0fdf4; }.operation-status.success .status-dot { background: currentcolor; }.operation-status.error { border-color: #fecaca; color: #b42318; background: #fef2f2; }.operation-status.error .status-dot { border-radius: 2px; transform: rotate(45deg); }
 .conversation-list::-webkit-scrollbar, .messages::-webkit-scrollbar, .summary-scroll::-webkit-scrollbar { width: 8px; }.conversation-list::-webkit-scrollbar-thumb, .messages::-webkit-scrollbar-thumb, .summary-scroll::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 8px; background: #cbd5e1; background-clip: padding-box; }

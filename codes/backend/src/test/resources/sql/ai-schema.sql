@@ -2,7 +2,7 @@ CREATE TABLE ai_task (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     request_id VARCHAR(64) NOT NULL UNIQUE,
     user_id BIGINT NOT NULL,
-    content_id BIGINT NOT NULL,
+    content_id BIGINT,
     conversation_id BIGINT,
     task_type VARCHAR(32) NOT NULL,
     provider VARCHAR(32) NOT NULL DEFAULT 'MOCK',
@@ -78,4 +78,20 @@ CREATE TABLE ai_usage_record (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_test_ai_usage_user FOREIGN KEY (user_id) REFERENCES `user` (id),
     CONSTRAINT fk_test_ai_usage_task FOREIGN KEY (task_id) REFERENCES ai_task (id)
+);
+
+CREATE TABLE ai_wrong_question_analysis (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    task_id BIGINT NOT NULL UNIQUE,
+    requester_id BIGINT NOT NULL,
+    exam_count INT NOT NULL,
+    question_count INT NOT NULL,
+    report_markdown CLOB NOT NULL,
+    input_snapshot_hash VARCHAR(64) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_test_wrong_analysis_task
+        FOREIGN KEY (task_id) REFERENCES ai_task (id),
+    CONSTRAINT fk_test_wrong_analysis_requester
+        FOREIGN KEY (requester_id) REFERENCES `user` (id)
 );

@@ -2,6 +2,7 @@ DROP TABLE IF EXISTS offline_teacher_recommendation;
 DROP TABLE IF EXISTS offline_student_preference;
 DROP TABLE IF EXISTS offline_teacher_profile;
 DROP TABLE IF EXISTS offline_teacher_application;
+DROP TABLE IF EXISTS ai_wrong_question_analysis;
 DROP TABLE IF EXISTS ai_message;
 DROP TABLE IF EXISTS ai_usage_record;
 DROP TABLE IF EXISTS ai_summary;

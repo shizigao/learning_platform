@@ -31,6 +31,8 @@ import type {
   QuestionPage,
   QuestionStatus,
   QuestionWritePayload,
+  WrongQuestionAnalysis,
+  WrongQuestionReviewPage,
 } from '@/types/exam'
 
 function data<T>(response: { data: ApiResponse<T> }): T {
@@ -327,6 +329,24 @@ export async function generatePersonalExamAiAnalysis(
   return data(
     await http.post<ApiResponse<ExamAiAnalysis>>(
       `/exams/${examId}/result/ai-analysis`,
+      { requestId },
+      { timeout: 630_000 },
+    ),
+  )
+}
+
+export async function getWrongQuestionReview(): Promise<WrongQuestionReviewPage> {
+  return data(
+    await http.get<ApiResponse<WrongQuestionReviewPage>>('/exams/wrong-review'),
+  )
+}
+
+export async function generateWrongQuestionAnalysis(
+  requestId: string,
+): Promise<WrongQuestionAnalysis> {
+  return data(
+    await http.post<ApiResponse<WrongQuestionAnalysis>>(
+      '/exams/wrong-review/analysis',
       { requestId },
       { timeout: 630_000 },
     ),

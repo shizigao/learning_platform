@@ -45,6 +45,7 @@ FLUSH PRIVILEGES;
 4. `006_user_account_info.sql`
 5. `007_offline_teaching.sql`
 6. `008_offline_teacher_availability.sql`
+7. `010_wrong_question_review.sql`
 
 `003_unify_content_type.sql` 会把历史五类资料类型统一为 `GENERAL`；`004_classroom.sql`
 会增加班级、成员、公告以及资料/考试班级发放范围；`005_exam_ai_analysis.sql`
@@ -52,7 +53,8 @@ FLUSH PRIVILEGES;
 `006_user_account_info.sql` 会增加用户头像的 MinIO 对象元数据表。
 `007_offline_teaching.sql` 会增加线下教师申请、公开教师资料、学生匹配偏好和
 AI 推荐结果表；`008_offline_teacher_availability.sql` 会为线下教师申请和公开
-教师资料增加可上课时间字段。以上脚本均不会删除历史业务数据。
+教师资料增加可上课时间字段；`010_wrong_question_review.sql` 会增加错题复习 AI
+分析报告表。以上脚本均不会删除历史业务数据。
 全新初始化的数据库无需执行增量脚本。
 
 ### 线下教师推荐测试数据（可选）

@@ -6,6 +6,7 @@ import com.learningplatform.ai.client.AiClientRequest;
 import com.learningplatform.ai.client.AiClientResponse;
 import com.learningplatform.ai.domain.AiConversation;
 import com.learningplatform.ai.domain.AiConversationStatus;
+import com.learningplatform.ai.domain.AiConversationTemplate;
 import com.learningplatform.ai.domain.AiMessage;
 import com.learningplatform.ai.domain.AiTask;
 import com.learningplatform.ai.domain.AiTaskStatus;
@@ -127,6 +128,42 @@ public class AiConversationService {
             String requestId,
             String question
     ) {
+        String normalizedQuestion = question.trim();
+        return explainInternal(
+                conversationId,
+                userId,
+                requesterAdmin,
+                requestId,
+                normalizedQuestion,
+                normalizedQuestion
+        );
+    }
+
+    public AiExplanationResponse explainTemplate(
+            Long conversationId,
+            Long userId,
+            boolean requesterAdmin,
+            String requestId,
+            AiConversationTemplate template
+    ) {
+        return explainInternal(
+                conversationId,
+                userId,
+                requesterAdmin,
+                requestId,
+                template.getDisplayText(),
+                template.getPrompt()
+        );
+    }
+
+    private AiExplanationResponse explainInternal(
+            Long conversationId,
+            Long userId,
+            boolean requesterAdmin,
+            String requestId,
+            String displayQuestion,
+            String providerQuestion
+    ) {
         AiConversation conversation = requireOwned(conversationId, userId);
         if (conversation.getStatus() != AiConversationStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.CONFLICT, "AI 会话已归档");
@@ -136,14 +173,13 @@ public class AiConversationService {
                 userId,
                 requesterAdmin
         );
-        String normalizedQuestion = question.trim();
         AiTaskLifecycleService.TaskCreation creation = taskService.create(
                 requestId,
                 userId,
                 conversation.getContentId(),
                 conversationId,
                 AiTaskType.EXPLANATION,
-                source.text().length() + normalizedQuestion.length()
+                source.text().length() + providerQuestion.length()
         );
         if (!creation.created()) {
             return existingExplanation(creation.task(), userId);
@@ -158,7 +194,7 @@ public class AiConversationService {
                 conversation.getContentId(),
                 conversationId,
                 source.text().length(),
-                normalizedQuestion.length()
+                providerQuestion.length()
         );
         try {
             quotaService.requireAvailable(userId, creation.task().getQuotaCost());
@@ -167,7 +203,7 @@ public class AiConversationService {
                     promptFactory.build(
                             source,
                             messageMapper.findByConversationId(conversationId),
-                            normalizedQuestion
+                            providerQuestion
                     );
             AiClientResponse clientResponse = requestGuard.execute(
                     userId,
@@ -180,7 +216,7 @@ public class AiConversationService {
                             running,
                             conversationId,
                             userId,
-                            normalizedQuestion,
+                            displayQuestion,
                             clientResponse
                     );
             LOGGER.info(

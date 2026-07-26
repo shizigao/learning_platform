@@ -367,3 +367,34 @@ export interface ExamAiAnalysisPage {
   quotaRemaining: number
   reports: ExamAiAnalysis[]
 }
+
+export interface WrongReviewExam {
+  resultId: number
+  examId: number
+  examName: string
+  fullScore: number
+  totalScore: number
+  passingScore: number
+  passed: boolean
+  answersVisible: boolean
+  generatedAt: string
+  questions: ExamResultQuestion[]
+}
+
+export interface WrongQuestionAnalysis {
+  id: number
+  task: AiTask
+  examCount: number
+  questionCount: number
+  reportMarkdown: string
+  inputSnapshotHash: string
+  createdAt: string
+}
+
+export interface WrongQuestionReviewPage {
+  exams: WrongReviewExam[]
+  totalQuestionCount: number
+  analyzableQuestionCount: number
+  quotaRemaining: number
+  reports: WrongQuestionAnalysis[]
+}

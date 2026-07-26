@@ -67,6 +67,16 @@ const router = createRouter({
           },
         },
         {
+          path: 'exams/wrong-review',
+          name: 'wrong-question-review',
+          component: () => import('@/views/WrongQuestionReviewView.vue'),
+          meta: {
+            title: '错题复习',
+            requiresAuth: true,
+            roles: ['USER', 'PUBLISHER', 'ADMIN'],
+          },
+        },
+        {
           path: 'exams/:id/result',
           name: 'exam-result',
           component: () => import('@/views/ExamResultView.vue'),

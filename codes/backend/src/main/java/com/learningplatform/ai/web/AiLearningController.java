@@ -6,6 +6,7 @@ import com.learningplatform.ai.dto.AiExplanationRequest;
 import com.learningplatform.ai.dto.AiExplanationResponse;
 import com.learningplatform.ai.dto.AiSummaryGenerateRequest;
 import com.learningplatform.ai.dto.AiSummaryResponse;
+import com.learningplatform.ai.dto.AiTemplateRequest;
 import com.learningplatform.ai.dto.AiTaskResponse;
 import com.learningplatform.ai.dto.AiUsageRecordResponse;
 import com.learningplatform.ai.service.AiConversationService;
@@ -158,6 +159,22 @@ public class AiLearningController {
                 isAdmin(principal),
                 request.requestId(),
                 request.question()
+        ));
+    }
+
+    @PostMapping("/conversations/{conversationId}/templates")
+    public ApiResponse<AiExplanationResponse> explainWithTemplate(
+            Authentication authentication,
+            @PathVariable Long conversationId,
+            @Valid @RequestBody AiTemplateRequest request
+    ) {
+        AuthenticatedUserPrincipal principal = principal(authentication);
+        return ApiResponse.success(conversationService.explainTemplate(
+                conversationId,
+                principal.userId(),
+                isAdmin(principal),
+                request.requestId(),
+                request.template()
         ));
     }
 

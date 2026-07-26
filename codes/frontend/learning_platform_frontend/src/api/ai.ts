@@ -7,6 +7,7 @@ import type {
   AiSummary,
   AiTask,
   AiUsageRecord,
+  AiConversationTemplate,
 } from '@/types/ai'
 
 // 前端超时必须晚于后端统一超时，才能展示后端返回的明确失败原因。
@@ -71,6 +72,20 @@ export async function explain(
     await http.post<ApiResponse<AiExplanation>>(
       `/ai/conversations/${conversationId}/messages`,
       { question, requestId },
+      { timeout: AI_REQUEST_TIMEOUT },
+    ),
+  )
+}
+
+export async function explainWithTemplate(
+  conversationId: number,
+  template: AiConversationTemplate,
+  requestId: string,
+): Promise<AiExplanation> {
+  return data(
+    await http.post<ApiResponse<AiExplanation>>(
+      `/ai/conversations/${conversationId}/templates`,
+      { template, requestId },
       { timeout: AI_REQUEST_TIMEOUT },
     ),
   )

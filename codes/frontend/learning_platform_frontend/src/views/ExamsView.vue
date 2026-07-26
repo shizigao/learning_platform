@@ -41,7 +41,11 @@ onMounted(load)
         eyebrow="EXAM CENTER"
         title="考试中心"
         description="查看考试说明、检查参与资格，并由服务器记录正式开始时间"
-      />
+      >
+        <RouterLink to="/exams/wrong-review">
+          <el-button type="primary">错题复习</el-button>
+        </RouterLink>
+      </SectionPageHeader>
       <div v-loading="loading" class="exam-grid">
         <article v-for="exam in exams" :key="exam.id" class="exam-card">
           <div><el-tag type="success">{{ statusLabels[exam.status] }}</el-tag><span>{{ exam.durationMinutes }} 分钟</span></div>

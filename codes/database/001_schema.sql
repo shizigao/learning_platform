@@ -526,7 +526,7 @@ CREATE TABLE IF NOT EXISTS `ai_task` (
     `content_id` BIGINT UNSIGNED NULL COMMENT '资料类任务关联资料；考试分析和教师推荐任务为空',
     `conversation_id` BIGINT UNSIGNED NULL COMMENT '会话ID，应用层关联',
     `task_type` VARCHAR(32) NOT NULL
-        COMMENT 'SUMMARY/EXPLANATION/EXAM_OVERALL_ANALYSIS/EXAM_PERSONAL_ANALYSIS/OFFLINE_TEACHER_RECOMMENDATION',
+        COMMENT 'SUMMARY/EXPLANATION/EXAM_OVERALL_ANALYSIS/EXAM_PERSONAL_ANALYSIS/WRONG_QUESTION_ANALYSIS/OFFLINE_TEACHER_RECOMMENDATION',
     `provider` VARCHAR(32) NOT NULL DEFAULT 'MOCK',
     `model` VARCHAR(100) NOT NULL,
     `status` VARCHAR(32) NOT NULL DEFAULT 'PENDING',
@@ -651,6 +651,31 @@ CREATE TABLE IF NOT EXISTS `ai_exam_analysis` (
         FOREIGN KEY (`requester_id`) REFERENCES `user` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
   COMMENT='考试结果AI分析报告';
+
+CREATE TABLE IF NOT EXISTS `ai_wrong_question_analysis` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `task_id` BIGINT UNSIGNED NOT NULL,
+    `requester_id` BIGINT UNSIGNED NOT NULL,
+    `exam_count` INT UNSIGNED NOT NULL,
+    `question_count` INT UNSIGNED NOT NULL,
+    `report_markdown` LONGTEXT NOT NULL,
+    `input_snapshot_hash` CHAR(64)
+        CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+        ON UPDATE CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_ai_wrong_question_analysis_task` (`task_id`),
+    KEY `idx_ai_wrong_question_analysis_requester_time`
+        (`requester_id`, `created_at`),
+    CONSTRAINT `chk_ai_wrong_question_analysis_counts`
+        CHECK (`exam_count` > 0 AND `question_count` > 0),
+    CONSTRAINT `fk_ai_wrong_question_analysis_task`
+        FOREIGN KEY (`task_id`) REFERENCES `ai_task` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `fk_ai_wrong_question_analysis_requester`
+        FOREIGN KEY (`requester_id`) REFERENCES `user` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+  COMMENT='用户最近考试错题的AI分析报告';
 
 CREATE TABLE IF NOT EXISTS `offline_teacher_application` (
     `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
