@@ -1,5 +1,7 @@
 # 智能在线学习考试平台数据库设计
 
+注释：此文档中的数据库设计仅为MVP阶段初步设计使用，最新完整的数据库表请参考database文件夹中的001schema.sql文件
+
 ## 1. 设计目标
 
 数据库使用 MySQL 8，覆盖用户、学习资料、在线考试、AI、订单权益和后台管理六个领域。MVP 使用单库，所有金额使用 `DECIMAL`，所有业务主键使用无符号 `BIGINT`，时间精度统一到毫秒。
@@ -18,46 +20,46 @@
 
 ## 2. 表清单
 
-| 领域 | 表 | 用途 |
-| --- | --- | --- |
-| 用户 | `user` | 用户账号及个人资料 |
-| 用户 | `role` | 普通用户、发布者、管理员角色 |
-| 用户 | `user_role` | 用户与角色关系 |
-| 班级 | `learning_class` | 班级主体、拥有者和邀请码 |
-| 班级 | `class_member` | 班级成员、班级角色和成员状态 |
-| 班级 | `class_announcement` | 班级公告 |
-| 学习 | `content_category` | 学习资料分类，支持一级/二级结构 |
-| 学习 | `learning_content` | 学习资料主信息和发布状态 |
-| 学习 | `content_class_scope` | 班级资料的发放范围 |
-| 学习 | `content_file` | 封面、正文文档、视频和附件对象 |
-| 学习 | `learning_progress` | 用户学习进度 |
-| 学习 | `content_comment` | 资料评论 |
-| 学习 | `content_like` | 点赞关系 |
-| 学习 | `content_favorite` | 收藏关系 |
-| 题库 | `question_bank` | 发布者题库 |
-| 题库 | `question` | 五类题目主信息 |
-| 题库 | `question_option` | 单选、多选和判断题选项 |
-| 考试 | `exam_paper` | 固定试卷 |
-| 考试 | `exam_paper_question` | 试卷题目、顺序和分值 |
-| 考试 | `exam` | 已发布考试及规则 |
-| 考试 | `exam_class_scope` | 班级考试的发放范围 |
-| 考试 | `exam_candidate` | 指定考生及参与状态 |
-| 考试 | `exam_attempt` | 一次考试作答会话 |
-| 考试 | `exam_answer` | 每道题的考生答案和评分 |
-| 考试 | `exam_result` | 最终成绩快照 |
-| AI | `ai_task` | AI 调用任务和处理状态 |
-| AI | `ai_summary` | 资料总结结果 |
-| AI | `ai_conversation` | 围绕资料的讲解会话 |
-| AI | `ai_message` | AI 会话消息 |
-| AI | `ai_usage_record` | AI 额度扣减和调用审计 |
-| 订单 | `product` | 资料、AI 次数包、考试次数包商品 |
-| 订单 | `orders` | 订单主表 |
-| 订单 | `order_item` | 下单时的商品快照 |
-| 订单 | `payment_record` | 模拟/真实支付流水 |
-| 权益 | `user_entitlement` | 资料访问权和次数额度 |
-| 系统 | `content_audit` | 资料审核记录 |
-| 系统 | `operation_log` | 关键操作日志 |
-| 系统 | `system_config` | 非敏感系统配置 |
+| 领域 | 表                    | 用途                            |
+| ---- | --------------------- | ------------------------------- |
+| 用户 | `user`                | 用户账号及个人资料              |
+| 用户 | `role`                | 普通用户、发布者、管理员角色    |
+| 用户 | `user_role`           | 用户与角色关系                  |
+| 班级 | `learning_class`      | 班级主体、拥有者和邀请码        |
+| 班级 | `class_member`        | 班级成员、班级角色和成员状态    |
+| 班级 | `class_announcement`  | 班级公告                        |
+| 学习 | `content_category`    | 学习资料分类，支持一级/二级结构 |
+| 学习 | `learning_content`    | 学习资料主信息和发布状态        |
+| 学习 | `content_class_scope` | 班级资料的发放范围              |
+| 学习 | `content_file`        | 封面、正文文档、视频和附件对象  |
+| 学习 | `learning_progress`   | 用户学习进度                    |
+| 学习 | `content_comment`     | 资料评论                        |
+| 学习 | `content_like`        | 点赞关系                        |
+| 学习 | `content_favorite`    | 收藏关系                        |
+| 题库 | `question_bank`       | 发布者题库                      |
+| 题库 | `question`            | 五类题目主信息                  |
+| 题库 | `question_option`     | 单选、多选和判断题选项          |
+| 考试 | `exam_paper`          | 固定试卷                        |
+| 考试 | `exam_paper_question` | 试卷题目、顺序和分值            |
+| 考试 | `exam`                | 已发布考试及规则                |
+| 考试 | `exam_class_scope`    | 班级考试的发放范围              |
+| 考试 | `exam_candidate`      | 指定考生及参与状态              |
+| 考试 | `exam_attempt`        | 一次考试作答会话                |
+| 考试 | `exam_answer`         | 每道题的考生答案和评分          |
+| 考试 | `exam_result`         | 最终成绩快照                    |
+| AI   | `ai_task`             | AI 调用任务和处理状态           |
+| AI   | `ai_summary`          | 资料总结结果                    |
+| AI   | `ai_conversation`     | 围绕资料的讲解会话              |
+| AI   | `ai_message`          | AI 会话消息                     |
+| AI   | `ai_usage_record`     | AI 额度扣减和调用审计           |
+| 订单 | `product`             | 资料、AI 次数包、考试次数包商品 |
+| 订单 | `orders`              | 订单主表                        |
+| 订单 | `order_item`          | 下单时的商品快照                |
+| 订单 | `payment_record`      | 模拟/真实支付流水               |
+| 权益 | `user_entitlement`    | 资料访问权和次数额度            |
+| 系统 | `content_audit`       | 资料审核记录                    |
+| 系统 | `operation_log`       | 关键操作日志                    |
+| 系统 | `system_config`       | 非敏感系统配置                  |
 
 ## 3. 主要关系
 

@@ -6,6 +6,10 @@ marked.setOptions({
   breaks: true,
 })
 
+/**
+ * 将 Markdown 转为经过白名单清洗的 HTML。
+ * 清洗是渲染用户资料的安全边界，调用方不得直接使用 `marked.parse` 的原始结果。
+ */
 export function renderSafeMarkdown(source: string): string {
   const html = marked.parse(source || '', { async: false }) as string
   return DOMPurify.sanitize(html, {
@@ -25,6 +29,7 @@ export interface MarkdownResourceReference {
   fileId: number
 }
 
+/** 找出正文中去重后的平台图片/附件占位协议，供页面批量换取授权 URL。 */
 export function findMarkdownResourceReferences(source: string): MarkdownResourceReference[] {
   const references = new Map<string, MarkdownResourceReference>()
   const pattern = /content-(image|file):\/\/(\d+)/g
@@ -36,6 +41,7 @@ export function findMarkdownResourceReferences(source: string): MarkdownResource
   return [...references.values()]
 }
 
+/** 用短期授权地址替换指定图片或附件占位协议。 */
 export function replaceMarkdownResourceReference(
   source: string,
   reference: MarkdownResourceReference,
@@ -47,6 +53,7 @@ export function replaceMarkdownResourceReference(
   )
 }
 
+/** 找出正文中去重后的站内学习资料引用 ID。 */
 export function findMarkdownContentReferences(source: string): number[] {
   const contentIds = new Set<number>()
   const pattern = /content-reference:\/\/(\d+)/g
@@ -56,6 +63,7 @@ export function findMarkdownContentReferences(source: string): number[] {
   return [...contentIds]
 }
 
+/** 将站内资料引用协议转换为前端详情路由；是否允许跳转由渲染组件决定。 */
 export function replaceMarkdownContentReference(
   source: string,
   contentId: number,

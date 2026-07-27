@@ -3,8 +3,15 @@ import axios from 'axios'
 import type { ApiResponse } from '@/types/api'
 import { clearAuthSession, getAccessToken } from '@/utils/auth-storage'
 
+/** 401 响应触发的全局事件；认证仓库监听它并同步清空内存中的用户。 */
 export const AUTH_UNAUTHORIZED_EVENT = 'learning-platform:unauthorized'
 
+/**
+ * 前端统一接口异常。
+ *
+ * `code` 是后端业务码，`status` 是 HTTP 状态，`traceId` 可交给后端定位日志。
+ * 网络未建立时三者可能为空，调用方应优先展示 `message`。
+ */
 export class ApiError extends Error {
   readonly code?: number
   readonly traceId?: string
@@ -19,12 +26,17 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * 全局 Axios 客户端。
+ * 业务接口以 `/api` 为默认前缀；页面只应调用本目录导出的接口函数。
+ */
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 15_000,
   headers: { 'Content-Type': 'application/json' },
 })
 
+/** 创建链路请求号；兼容非安全上下文中不可用的 `crypto.randomUUID`。 */
 function createRequestId(): string {
   if (typeof globalThis.crypto?.randomUUID === 'function') {
     return globalThis.crypto.randomUUID()
@@ -33,12 +45,14 @@ function createRequestId(): string {
   return `${Date.now().toString(16)}-${randomPart}`
 }
 
+/** 登录和注册是公开接口，不能携带可能已经失效的历史 Token。 */
 function isPublicAuthRequest(url?: string): boolean {
   if (!url) return false
   const path = url.split('?', 1)[0] ?? ''
   return path.endsWith('/auth/login') || path.endsWith('/auth/register')
 }
 
+// 请求拦截器统一注入身份和链路信息，避免各业务 API 重复实现。
 http.interceptors.request.use((config) => {
   const token = getAccessToken()
   // 登录、注册必须与旧会话隔离，避免残留或过期 Token 阻断公开认证接口。
@@ -52,6 +66,7 @@ http.interceptors.request.use((config) => {
   return config
 })
 
+// 响应拦截器把业务失败、HTTP 失败和网络失败归一为 ApiError。
 http.interceptors.response.use(
   (response) => {
     const body = response.data as ApiResponse<unknown>

@@ -23,6 +23,12 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
+/**
+ * 考生进入、开始和恢复考试的会话边界。
+ *
+ * <p>服务同时校验考试发布状态、参与范围、考试时间窗、考生状态和个人截止时间。
+ * 首次开始会锁定考生记录并创建唯一作答，重复开始则安全恢复已有会话。</p>
+ */
 @Service
 public class CandidateExamSessionService {
     private final ExamService examService;
@@ -48,6 +54,7 @@ public class CandidateExamSessionService {
         this.runtimeStateService = runtimeStateService;
     }
 
+    /** 返回考试说明、试卷摘要和当前用户是否可开始/继续的原因。 */
     public CandidateExamOverviewResponse overview(Long examId, Long userId) {
         LocalDateTime now = now();
         Exam exam = examService.getRequired(examId);
@@ -63,6 +70,7 @@ public class CandidateExamSessionService {
         );
     }
 
+    /** 仅计算进入资格，供列表或入口页轻量刷新。 */
     public ExamEligibilityResponse eligibility(Long examId, Long userId) {
         LocalDateTime now = now();
         Exam exam = examService.getRequired(examId);
@@ -72,6 +80,10 @@ public class CandidateExamSessionService {
         return eligibility(exam, candidate, attempt, now);
     }
 
+    /**
+     * 首次开始或恢复考试。
+     * 个人截止时间取“开始时间 + 时长”和考试统一结束时间中的较早值。
+     */
     @Transactional
     public ExamStartResponse start(Long examId, Long userId) {
         Exam exam = examService.getRequired(examId);
@@ -112,6 +124,7 @@ public class CandidateExamSessionService {
         return startResponse(exam, attempt, now);
     }
 
+    /** 恢复已存在且仍在有效时间内的作答，不创建第二次作答。 */
     @Transactional
     public ExamStartResponse resume(Long examId, Long userId) {
         Exam exam = examService.getRequired(examId);

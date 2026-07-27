@@ -16,6 +16,12 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import java.util.List;
 
+/**
+ * AI 任务的幂等创建与状态流转服务。
+ *
+ * <p>业务服务应先创建任务，仅在 {@link TaskCreation#created()} 为 true 时扣减额度
+ * 并调用供应商；重复请求返回原任务，从而避免浏览器重试造成重复消费。</p>
+ */
 @Service
 public class AiTaskLifecycleService {
     private final AiTaskMapper taskMapper;
@@ -26,6 +32,10 @@ public class AiTaskLifecycleService {
         this.aiClient = aiClient;
     }
 
+    /**
+     * 按请求幂等号创建 PENDING 任务。
+     * 已存在的请求号必须与用户、资源、会话和任务类型完全一致。
+     */
     @Transactional
     public TaskCreation create(
             String requestedId,
@@ -58,6 +68,7 @@ public class AiTaskLifecycleService {
         return new TaskCreation(require(task.getId(), userId), true);
     }
 
+    /** 原子地把 PENDING 任务标记为 RUNNING。 */
     @Transactional
     public AiTask start(Long taskId, Long userId) {
         if (taskMapper.markRunning(taskId, now()) != 1) {
@@ -66,6 +77,7 @@ public class AiTaskLifecycleService {
         return require(taskId, userId);
     }
 
+    /** 保存截断后的安全错误信息；不得把密钥或供应商原始响应写入该字段。 */
     @Transactional
     public void fail(Long taskId, String errorCode, String safeMessage) {
         taskMapper.markFailed(
@@ -76,6 +88,7 @@ public class AiTaskLifecycleService {
         );
     }
 
+    /** 读取当前用户拥有的任务，不允许通过任务 ID 横向访问。 */
     public AiTask require(Long taskId, Long userId) {
         return taskMapper.findByIdAndUser(taskId, userId)
                 .orElseThrow(() -> new BusinessException(
@@ -84,10 +97,12 @@ public class AiTaskLifecycleService {
                 ));
     }
 
+    /** 返回适合接口输出的单个任务状态。 */
     public AiTaskResponse detail(Long taskId, Long userId) {
         return AiTaskResponse.from(require(taskId, userId));
     }
 
+    /** 按用户列出任务并转换为只读响应。 */
     public List<AiTaskResponse> list(Long userId) {
         return taskMapper.findByUserId(userId).stream()
                 .map(AiTaskResponse::from)
@@ -129,6 +144,7 @@ public class AiTaskLifecycleService {
         return LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS);
     }
 
+    /** 任务及“是否本次新建”的组合结果，是调用方执行扣次的幂等边界。 */
     public record TaskCreation(AiTask task, boolean created) {
     }
 }

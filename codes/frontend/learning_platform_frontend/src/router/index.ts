@@ -3,6 +3,10 @@ import { createRouter, createWebHistory } from 'vue-router'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
 import { useAuthStore } from '@/stores/auth'
 
+/**
+ * 应用路由表。
+ * 页面按公共布局、认证布局和异常兜底分组；业务页通过懒加载减小首屏包体。
+ */
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -316,6 +320,10 @@ const router = createRouter({
   scrollBehavior: () => ({ top: 0 }),
 })
 
+/**
+ * 全局权限守卫：先恢复会话，再依次处理访客页、登录要求和角色要求。
+ * 角色判断采用“满足任一角色即可”，最终资源权限仍由后端决定。
+ */
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
   await authStore.initialize()
@@ -332,12 +340,14 @@ router.beforeEach(async (to) => {
   return true
 })
 
+/** 将路由标题与应用标题组合，保证浏览器标签能反映当前页面。 */
 router.afterEach((to) => {
   const pageTitle = typeof to.meta.title === 'string' ? to.meta.title : ''
   const appTitle = import.meta.env.VITE_APP_TITLE || '智能在线学习考试平台'
   document.title = pageTitle ? `${pageTitle} - ${appTitle}` : appTitle
 })
 
+/** 捕获懒加载资源失败并转入统一错误页，避免空白页面。 */
 router.onError((error, to) => {
   if (to.name === 'error') return
   void router.replace({

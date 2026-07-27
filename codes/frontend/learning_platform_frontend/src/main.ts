@@ -7,6 +7,7 @@ import App from './App.vue'
 import router from './router'
 import './style.css'
 
+// 应用仅在此处装配全局插件；业务依赖应通过模块导入或组合式函数显式使用。
 const app = createApp(App)
 
 app.use(createPinia())

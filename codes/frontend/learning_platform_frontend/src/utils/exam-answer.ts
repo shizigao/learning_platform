@@ -9,12 +9,17 @@ export interface ExamAnswerDraft {
   text: string
 }
 
+/** 返回题型需要初始化的最少答案槽位数，填空题按题目空格数展开。 */
 export function minimumAnswerValues(questionType: QuestionType, blankCount: number): number {
   if (questionType === 'FILL_BLANK') return Math.max(1, blankCount)
   if (questionType === 'SINGLE_CHOICE' || questionType === 'TRUE_FALSE') return 1
   return 0
 }
 
+/**
+ * 把页面草稿规范化为后端作答协议。
+ * 简答题只提交 `text`，选择/判断/填空题只提交 `values`，避免题型字段混用。
+ */
 export function examAnswerPayload(
   question: Pick<CandidatePaperQuestion, 'questionType'> | undefined,
   answer: ExamAnswerDraft | undefined,

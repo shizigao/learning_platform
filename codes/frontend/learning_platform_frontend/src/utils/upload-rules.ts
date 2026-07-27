@@ -1,7 +1,9 @@
 import type { ContentFileRole } from '@/types/content'
 
+/** 使用 MiB（1024² 字节）与后端及反向代理限制保持一致。 */
 const MEBIBYTE = 1024 * 1024
 
+/** 单类资料文件的前端选择提示与预校验规则。 */
 export interface UploadRule {
   role: ContentFileRole
   label: string
@@ -13,6 +15,7 @@ export interface UploadRule {
   description: string
 }
 
+/** 由简洁参数构造同时供 input、提示文案和校验使用的不可变规则。 */
 function rule(
   role: ContentFileRole,
   label: string,
@@ -33,6 +36,7 @@ function rule(
   }
 }
 
+/** 各文件用途的唯一规则表；调整限制时还需同步后端和 Nginx 配置。 */
 export const UPLOAD_RULES: Record<ContentFileRole, UploadRule> = {
   COVER: rule('COVER', '封面', ['jpg', 'jpeg', 'png', 'webp'], 10),
   INLINE_IMAGE: rule('INLINE_IMAGE', '正文图片', ['jpg', 'jpeg', 'png', 'webp'], 10),
@@ -54,6 +58,10 @@ export const UPLOAD_RULES: Record<ContentFileRole, UploadRule> = {
 
 export const UPLOAD_RULE_OPTIONS = Object.values(UPLOAD_RULES)
 
+/**
+ * 在发起上传前校验扩展名、大小和空文件。
+ * 返回 `undefined` 表示通过，否则返回可直接展示给用户的精确错误信息。
+ */
 export function validateUploadFile(file: File, role: ContentFileRole): string | undefined {
   const uploadRule = UPLOAD_RULES[role]
   const extension = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() : undefined

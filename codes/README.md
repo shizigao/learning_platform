@@ -412,6 +412,10 @@ Get-NetTCPConnection -LocalPort 5173,8080,3306,6379,9000,9001 `
 
 ## 11. 更多文档
 
+- [开发文档总索引](docs/README.md)
+- [需求、可行性与技术设计](docs/开发文档.md)
+- [完整 HTTP API 文档](docs/API文档.md)
+- [代码导读与注释约定](docs/代码导读.md)
 - [详细部署指南](项目部署.md)
 - [数据库初始化说明](database/README.md)
 - [本地 Redis 与 MinIO](infrastructure/README.md)

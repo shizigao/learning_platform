@@ -19,6 +19,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
+/**
+ * 学习资料资源级访问控制的唯一入口。
+ *
+ * <p>它组合资料发布状态、管理员/发布者身份、班级成员关系和购买权益。
+ * Controller、学习行为、AI 和文件下载均应复用本服务，避免不同入口产生权限差异。</p>
+ */
 @Service
 public class ContentAccessService {
     private final LearningContentMapper contentMapper;
@@ -41,6 +47,10 @@ public class ContentAccessService {
         this.classScopeMapper = classScopeMapper;
     }
 
+    /**
+     * 判断用户是否可访问资料正文。
+     * 未发布资料对所有读者不可见；管理员和发布者只对已发布资料享有直通权限。
+     */
     public boolean hasAccess(Long userId, boolean requesterAdmin, LearningContent content) {
         if (content.getStatus() != ContentStatus.PUBLISHED) {
             return false;
@@ -55,6 +65,7 @@ public class ContentAccessService {
         return entitlementService.hasActiveContentAccess(userId, content.getId());
     }
 
+    /** 返回可访问的已发布资料，否则抛出不泄露资源细节的业务异常。 */
     public LearningContent requireAccess(Long contentId, Long userId, boolean requesterAdmin) {
         LearningContent content = getPublished(contentId);
         if (!hasAccess(userId, requesterAdmin, content)) {
@@ -66,6 +77,7 @@ public class ContentAccessService {
         return content;
     }
 
+    /** 校验资料访问权和文件归属后生成短期预览地址。 */
     public String previewUrl(
             Long contentId,
             Long fileId,
@@ -77,6 +89,7 @@ public class ContentAccessService {
         return storageService.createAuthorizedPreviewUrl(file.getObjectName());
     }
 
+    /** 校验资料访问权和文件归属后生成带原文件名的短期下载地址。 */
     public String downloadUrl(
             Long contentId,
             Long fileId,
@@ -88,6 +101,12 @@ public class ContentAccessService {
         return storageService.createAuthorizedDownloadUrl(file.getObjectName(), file.getOriginalName());
     }
 
+    /**
+     * 发放单份资料访问权。
+     *
+     * @param sourceOrderItemId 来源订单项；非空时由权益层保证同一订单项只发放一次
+     * @param expiresAt 访问权到期时间；{@code null} 表示长期有效
+     */
     @Transactional
     public UserEntitlement grantContentAccess(
             Long userId,

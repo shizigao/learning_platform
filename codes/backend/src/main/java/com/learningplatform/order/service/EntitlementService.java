@@ -21,6 +21,13 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
+/**
+ * 用户权益的查询、发放与并发扣减服务。
+ *
+ * <p>资料访问权是资源型权益，AI/考试次数是配额型权益；两者字段约束不同。
+ * 支付发放以订单项为幂等键，配额消费按最早可用批次加锁并使用版本号更新，
+ * 防止并发请求把余额扣成负数。</p>
+ */
 @Service
 public class EntitlementService {
     private final UserEntitlementMapper entitlementMapper;
@@ -37,12 +44,14 @@ public class EntitlementService {
         this.itemMapper = itemMapper;
     }
 
+    /** 列出用户全部权益批次，包含已用完或失效批次供历史展示。 */
     public List<EntitlementResponse> list(Long userId) {
         return entitlementMapper.findByUserId(userId).stream()
                 .map(EntitlementResponse::from)
                 .toList();
     }
 
+    /** 聚合前端常用的四种次数余额。 */
     public EntitlementBalancesResponse balances(Long userId) {
         return new EntitlementBalancesResponse(
                 availableQuota(userId, EntitlementType.AI_QUOTA),
@@ -52,17 +61,20 @@ public class EntitlementService {
         );
     }
 
+    /** 判断用户是否拥有当前有效的指定资料访问权。 */
     public boolean hasActiveContentAccess(Long userId, Long contentId) {
         return userId != null
                 && contentId != null
                 && entitlementMapper.hasActiveContentAccess(userId, contentId);
     }
 
+    /** 汇总指定配额类型所有有效批次的可用次数。 */
     public int availableQuota(Long userId, EntitlementType entitlementType) {
         requireQuotaType(entitlementType);
         return entitlementMapper.sumAvailableQuota(userId, entitlementType);
     }
 
+    /** 管理端向指定权益批次追加次数，并保留原批次审计关系。 */
     @Transactional
     public EntitlementResponse increaseQuota(
             Long entitlementId,
@@ -92,6 +104,10 @@ public class EntitlementService {
         );
     }
 
+    /**
+     * 原子消费配额。
+     * 单次消费可跨越多个权益批次，任一阶段失败会由事务回滚全部扣减。
+     */
     @Transactional
     public void consumeQuota(
             Long userId,
@@ -126,6 +142,7 @@ public class EntitlementService {
         }
     }
 
+    /** 创建经过类型不变量校验的新权益，并拒绝重复订单项。 */
     @Transactional
     public EntitlementResponse create(UserEntitlement entitlement) {
         normalizeAndValidate(entitlement);
@@ -141,6 +158,7 @@ public class EntitlementService {
         return EntitlementResponse.from(entitlement);
     }
 
+    /** 为已支付订单的每个订单项幂等发放对应权益。 */
     @Transactional
     public List<EntitlementResponse> grantForPaidOrder(Long orderId, Long userId) {
         Order order = orderMapper.findById(orderId)
