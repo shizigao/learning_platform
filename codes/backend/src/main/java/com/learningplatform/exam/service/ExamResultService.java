@@ -55,7 +55,7 @@ public class ExamResultService {
                 .map(answer -> presentationService.response(answer, answersVisible))
                 .toList();
         return new ExamResultDetailResponse(
-                com.learningplatform.exam.dto.ExamResultSummaryResponse.from(result),
+                com.learningplatform.exam.dto.ExamResultSummaryResponse.from(result, questions),
                 answersVisible,
                 questions
         );

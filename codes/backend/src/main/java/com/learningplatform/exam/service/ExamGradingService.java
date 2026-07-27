@@ -144,7 +144,11 @@ public class ExamGradingService {
             throw new BusinessException(ErrorCode.CONFLICT, "仍有主观题尚未批改");
         }
         ExamResult result = refreshResult(attempt, exam, true);
-        return ExamResultSummaryResponse.from(result);
+        List<ExamResultQuestionResponse> questions = answerMapper.findByAttemptId(attemptId)
+                .stream()
+                .map(answer -> presentationService.response(answer, true))
+                .toList();
+        return ExamResultSummaryResponse.from(result, questions);
     }
 
     private void gradeAutomatically(ExamAnswer answer, LocalDateTime gradedAt) {
@@ -274,6 +278,8 @@ public class ExamGradingService {
         result.setIncorrectCount((int) answers.stream()
                 .filter(answer -> answer.getGradingStatus() != ExamAnswerGradingStatus.UNANSWERED)
                 .filter(answer -> Boolean.FALSE.equals(answer.getCorrect()))
+                .filter(answer -> answer.getScore() != null)
+                .filter(answer -> answer.getScore().compareTo(BigDecimal.ZERO) == 0)
                 .count());
         result.setUnansweredCount((int) answers.stream()
                 .filter(answer -> answer.getGradingStatus() == ExamAnswerGradingStatus.UNANSWERED)
