@@ -164,7 +164,11 @@ public class ExamGradingService {
             throw new BusinessException(ErrorCode.CONFLICT, "仍有主观题尚未批改");
         }
         ExamResult result = refreshResult(attempt, exam, true);
-        return ExamResultSummaryResponse.from(result);
+        List<ExamResultQuestionResponse> questions = answerMapper.findByAttemptId(attemptId)
+                .stream()
+                .map(answer -> presentationService.response(answer, true))
+                .toList();
+        return ExamResultSummaryResponse.from(result, questions);
     }
 
     /** 执行评分Automatically核心计算或业务处理，并保证失败不会留下不一致的持久化结果。 */
@@ -300,6 +304,8 @@ public class ExamGradingService {
         result.setIncorrectCount((int) answers.stream()
                 .filter(answer -> answer.getGradingStatus() != ExamAnswerGradingStatus.UNANSWERED)
                 .filter(answer -> Boolean.FALSE.equals(answer.getCorrect()))
+                .filter(answer -> answer.getScore() != null)
+                .filter(answer -> answer.getScore().compareTo(BigDecimal.ZERO) == 0)
                 .count());
         result.setUnansweredCount((int) answers.stream()
                 .filter(answer -> answer.getGradingStatus() == ExamAnswerGradingStatus.UNANSWERED)

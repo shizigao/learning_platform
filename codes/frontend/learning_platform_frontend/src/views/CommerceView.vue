@@ -43,14 +43,14 @@ const creatingId = ref<number>()
 const payingId = ref<number>()
 const cancellingId = ref<number>()
 const quantities = reactive<Record<number, number>>({})
-const productType = ref<ProductType | undefined>(
+const productType = ref<ProductType | 'ALL'>(
   route.query.type === 'CONTENT' ||
     route.query.type === 'AI_PACKAGE' ||
     route.query.type === 'EXAM_PACKAGE' ||
     route.query.type === 'EXAM_OVERALL_AI_PACKAGE' ||
     route.query.type === 'EXAM_PERSONAL_AI_PACKAGE'
     ? route.query.type
-    : undefined,
+    : 'ALL',
 )
 const orderFilters = reactive({
   status: undefined as OrderStatus | undefined,
@@ -59,9 +59,9 @@ const orderFilters = reactive({
 })
 
 const visibleProducts = computed(() =>
-  productType.value
-    ? products.value.filter((product) => product.productType === productType.value)
-    : products.value,
+  productType.value === 'ALL'
+    ? products.value
+    : products.value.filter((product) => product.productType === productType.value),
 )
 const ownedContentResourceIds = computed(
   () =>
@@ -270,7 +270,7 @@ onMounted(() => Promise.all([loadProducts(), loadOrders(), loadEntitlements()]))
           <el-tab-pane label="商品购买" name="products">
             <div class="product-toolbar">
               <el-radio-group v-model="productType">
-                <el-radio-button :value="undefined">全部商品</el-radio-button>
+                <el-radio-button value="ALL">全部商品</el-radio-button>
                 <el-radio-button value="CONTENT">付费资料</el-radio-button>
                 <el-radio-button value="AI_PACKAGE">AI 次数包</el-radio-button>
                 <el-radio-button value="EXAM_PACKAGE">考试次数包</el-radio-button>

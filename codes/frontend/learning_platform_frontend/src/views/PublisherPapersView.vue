@@ -39,6 +39,10 @@ const statusLabels: Record<ExamPaperStatus, string> = {
   ARCHIVED: '已归档',
 }
 
+function displayTime(value?: string): string {
+  return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '—'
+}
+
 interface SelectedQuestion {
   questionId: number
   stem: string
@@ -276,7 +280,9 @@ onMounted(load)
               <el-tag :type="row.status === 'READY' ? 'success' : 'info'">{{ statusLabels[row.status as ExamPaperStatus] }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="updatedAt" label="更新时间" min-width="175" />
+          <el-table-column label="更新时间" min-width="175">
+            <template #default="{ row }">{{ displayTime(row.updatedAt) }}</template>
+          </el-table-column>
           <el-table-column label="操作" width="210" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" :icon="View" @click="openPreview(row.id)">预览</el-button>

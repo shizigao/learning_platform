@@ -91,11 +91,7 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div class="hero-panel" aria-label="平台能力预览">
-        <div class="panel-heading"><span>今日学习概览</span><el-tag type="success" effect="light" round>持续学习中</el-tag></div>
-        <div class="progress-card">
-          <div class="progress-meta"><span>课程学习进度</span><strong>68%</strong></div>
-          <el-progress :percentage="68" :stroke-width="10" :show-text="false" />
-        </div>
+        <div class="panel-heading"><span>平台能力概览</span><el-tag type="success" effect="light" round>核心功能已开放</el-tag></div>
         <div class="feature-grid">
           <article><span class="feature-icon blue"><Document /></span><strong>学习资料</strong><small>图文、文档与视频</small></article>
           <article><span class="feature-icon purple"><MagicStick /></span><strong>AI 助手</strong><small>总结与知识讲解</small></article>
@@ -142,7 +138,7 @@ onBeforeUnmount(() => {
   <section class="capability-section">
     <div class="page-container section-heading">
       <div><span>核心能力</span><h2>一个平台，完成学习全过程</h2></div>
-      <p>当前为基础框架页面，各业务入口将在后续阶段逐步开放。</p>
+      <p>学习资料、在线考试、AI 助手、班级与错题复习等主要功能已经开放使用。</p>
     </div>
   </section>
 </template>
@@ -161,11 +157,8 @@ onBeforeUnmount(() => {
 .status-dot.offline { background: #f04438; }
 .status-dot.checking { animation: pulse 1s infinite alternate; }
 .hero-panel { border: 1px solid rgb(255 255 255 / 75%); border-radius: 24px; background: rgb(255 255 255 / 88%); box-shadow: 0 32px 80px rgb(29 78 216 / 13%); padding: 28px; backdrop-filter: blur(18px); }
-.panel-heading, .progress-meta { display: flex; align-items: center; justify-content: space-between; }
+.panel-heading { display: flex; align-items: center; justify-content: space-between; }
 .panel-heading { font-size: 16px; font-weight: 700; }
-.progress-card { border-radius: 16px; margin: 24px 0; background: #f8faff; padding: 20px; }
-.progress-meta { margin-bottom: 14px; color: var(--lp-text-secondary); font-size: 14px; }
-.progress-meta strong { color: var(--lp-primary); font-size: 20px; }
 .feature-grid { display: grid; gap: 12px; grid-template-columns: repeat(3, 1fr); }
 .feature-grid article { display: flex; min-width: 0; border: 1px solid var(--lp-border); border-radius: 14px; flex-direction: column; padding: 16px; }
 .feature-grid strong { margin-top: 14px; font-size: 14px; }

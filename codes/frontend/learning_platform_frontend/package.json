@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "test": "node --experimental-strip-types --test tests/exam-answer.test.ts tests/upload-rules.test.ts tests/markdown-reference.test.ts tests/reading-progress.test.ts",
+    "test": "node --experimental-strip-types --test tests/exam-answer.test.ts tests/upload-rules.test.ts tests/markdown-reference.test.ts tests/reading-progress.test.ts tests/ui-regressions.test.ts",
     "test:answers": "node --experimental-strip-types --test tests/exam-answer.test.ts",
     "preview": "vite preview"
   },

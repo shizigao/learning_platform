@@ -19,6 +19,7 @@ import type {
   QuestionType,
 } from '@/types/exam'
 import { examAnswerPayload, minimumAnswerValues } from '@/utils/exam-answer'
+import { shouldShowExamCountdown } from '@/utils/ui-state'
 
 const route = useRoute()
 const examId = Number(route.params.id)
@@ -64,6 +65,13 @@ const hasSubmittedAttempt = computed(() =>
   || overview.value?.eligibility.attemptStatus === 'GRADING'
   || overview.value?.eligibility.attemptStatus === 'COMPLETED'
   || overview.value?.eligibility.attemptStatus === 'SUBMITTED',
+)
+const showCountdown = computed(() =>
+  shouldShowExamCountdown(
+    overview.value?.eligibility.attemptId,
+    overview.value?.eligibility.attemptStatus,
+    submission.value != null,
+  ),
 )
 
 function displayTime(value?: string): string {
@@ -176,7 +184,7 @@ async function load(): Promise<void> {
   try {
     overview.value = await getCandidateExamOverview(examId)
     const eligibility = overview.value.eligibility
-    if (eligibility.attemptId && eligibility.deadlineAt) {
+    if (showCountdown.value && eligibility.deadlineAt) {
       syncCountdown(eligibility.serverTime, eligibility.deadlineAt)
       if (eligibility.canStart) {
         hydrateSession(await resumeExam(examId))
@@ -253,7 +261,7 @@ onBeforeUnmount(() => {
               <h1>{{ overview.exam.name }}</h1>
               <p>{{ overview.paper.name }} · {{ overview.paper.questionCount }} 题 · {{ overview.paper.totalScore }} 分</p>
             </div>
-            <div v-if="overview.eligibility.attemptId" class="timer" :class="{ expired: remainingSeconds === 0 }">
+            <div v-if="showCountdown" class="timer" :class="{ expired: remainingSeconds === 0 }">
               <small>服务端剩余时间</small>
               <strong>{{ remainingText }}</strong>
             </div>

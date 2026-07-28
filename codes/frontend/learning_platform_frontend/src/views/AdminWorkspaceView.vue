@@ -26,6 +26,7 @@ import { getAdminOrder, listAdminOrders } from '@/api/order'
 import ContentStatusTag from '@/components/ContentStatusTag.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import SectionPageHeader from '@/components/SectionPageHeader.vue'
+import { useAuthStore } from '@/stores/auth'
 import type {
   AdminExamDetail,
   AdminExamSummary,
@@ -42,7 +43,9 @@ import type {
   ContentSummary,
 } from '@/types/content'
 import type { Order, OrderStatus } from '@/types/order'
+import { canChangeAdminUserStatus } from '@/utils/ui-state'
 
+const authStore = useAuthStore()
 const activeTab = ref('review')
 const reviewLoading = ref(false)
 const contents = ref<ContentSummary[]>([])
@@ -331,6 +334,10 @@ function searchUsers(): void {
 }
 
 async function changeUserStatus(user: AdminUser): Promise<void> {
+  if (!canChangeAdminUserStatus(user.id, user.status, authStore.user?.id)) {
+    ElMessage.warning('不能修改当前登录账号的状态')
+    return
+  }
   const nextStatus: UserStatus = user.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE'
   const disabling = nextStatus === 'DISABLED'
   try {
@@ -564,7 +571,7 @@ onMounted(() =>
                   <el-button
                     link
                     :type="row.status === 'ACTIVE' ? 'danger' : 'success'"
-                    :disabled="row.status === 'LOCKED'"
+                    :disabled="!canChangeAdminUserStatus(row.id, row.status, authStore.user?.id)"
                     @click="changeUserStatus(row as AdminUser)"
                   >
                     {{ row.status === 'ACTIVE' ? '禁用' : '启用' }}

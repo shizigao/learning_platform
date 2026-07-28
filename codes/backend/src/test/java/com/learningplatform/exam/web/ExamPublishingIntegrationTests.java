@@ -641,16 +641,62 @@ class ExamPublishingIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalScore").value(90.0))
                 .andExpect(jsonPath("$.data.passed").value(true))
+                .andExpect(jsonPath("$.data.correctCount").value(1))
+                .andExpect(jsonPath("$.data.partialCreditCount").value(1))
+                .andExpect(jsonPath("$.data.incorrectCount").value(0))
+                .andExpect(jsonPath("$.data.pendingReviewCount").value(0))
                 .andExpect(jsonPath("$.data.gradingCompleted").value(true));
 
         mockMvc.perform(get("/api/exams/{id}/result", examId)
                         .header(AUTHORIZATION, bearer(candidateToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.result.correctCount").value(1))
-                .andExpect(jsonPath("$.data.result.incorrectCount").value(1))
+                .andExpect(jsonPath("$.data.result.partialCreditCount").value(1))
+                .andExpect(jsonPath("$.data.result.incorrectCount").value(0))
                 .andExpect(jsonPath("$.data.result.unansweredCount").value(0))
+                .andExpect(jsonPath("$.data.result.pendingReviewCount").value(0))
                 .andExpect(jsonPath("$.data.answersVisible").value(false))
                 .andExpect(jsonPath("$.data.questions[0].correctAnswer").doesNotExist());
+    }
+
+    @Test
+    void showsPendingReviewCountInTentativeCandidateResult() throws Exception {
+        long examId = createPublishedActiveExam();
+        MvcResult started = mockMvc.perform(post("/api/exams/{id}/start", examId)
+                        .header(AUTHORIZATION, bearer(candidateToken)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        mockMvc.perform(put("/api/exams/{examId}/answers", examId)
+                        .header(AUTHORIZATION, bearer(candidateToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "answers": [
+                                    {"questionId": %d, "answer": {"values": ["A"]}},
+                                    {"questionId": %d, "answer": {
+                                      "values": [],
+                                      "text": "JVM 加载并执行字节码"
+                                    }}
+                                  ]
+                                }
+                                """.formatted(singleQuestionId, shortQuestionId)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/exams/{id}/submit", examId)
+                        .header(AUTHORIZATION, bearer(candidateToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.attemptId")
+                        .value(responseData(started).path("attemptId").asLong()));
+
+        mockMvc.perform(get("/api/exams/{id}/result", examId)
+                        .header(AUTHORIZATION, bearer(candidateToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.result.gradingCompleted").value(false))
+                .andExpect(jsonPath("$.data.result.correctCount").value(1))
+                .andExpect(jsonPath("$.data.result.partialCreditCount").value(0))
+                .andExpect(jsonPath("$.data.result.incorrectCount").value(0))
+                .andExpect(jsonPath("$.data.result.unansweredCount").value(0))
+                .andExpect(jsonPath("$.data.result.pendingReviewCount").value(1));
     }
 
     @Test

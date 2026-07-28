@@ -270,8 +270,10 @@ export interface ExamResultSummary {
   passingScore: number
   passed: boolean
   correctCount: number
+  partialCreditCount: number
   incorrectCount: number
   unansweredCount: number
+  pendingReviewCount: number
   gradingCompleted: boolean
   generatedAt: string
 }

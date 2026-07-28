@@ -80,8 +80,10 @@ onMounted(load)
             <article><span>及格分</span><strong>{{ Number(result.result.passingScore).toFixed(2) }}</strong></article>
             <article><span>结果</span><strong>{{ result.result.passed ? '及格' : '未及格' }}</strong></article>
             <article><span>正确</span><strong>{{ result.result.correctCount }} 题</strong></article>
+            <article><span>部分得分</span><strong>{{ result.result.partialCreditCount }} 题</strong></article>
             <article><span>错误</span><strong>{{ result.result.incorrectCount }} 题</strong></article>
             <article><span>未作答</span><strong>{{ result.result.unansweredCount }} 题</strong></article>
+            <article><span>待批改</span><strong>{{ result.result.pendingReviewCount }} 题</strong></article>
           </div>
 
           <div class="answer-rule">
@@ -118,7 +120,7 @@ onMounted(load)
 .result-hero span { font-size: 12px; font-weight: 900; letter-spacing: .16em; }.result-hero h1 { margin: 8px 0; }.result-hero p { margin: 0; opacity: .84; }
 .result-actions { display: flex; align-items: flex-end; flex-direction: column; gap: 12px; }
 .result-actions > strong { font-size: 52px; }.result-hero small { font-size: 18px; }
-.summary-grid { display: grid; gap: 14px; margin-top: 18px; grid-template-columns: repeat(5, 1fr); }
+.summary-grid { display: grid; gap: 14px; margin-top: 18px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
 .summary-grid article { border: 1px solid var(--lp-border); border-radius: 14px; background: #fff; padding: 18px; }
 .summary-grid span { color: var(--lp-text-secondary); font-size: 13px; }.summary-grid strong { display: block; margin-top: 8px; font-size: 20px; }
 .answer-rule { margin: 22px 0 12px; }
