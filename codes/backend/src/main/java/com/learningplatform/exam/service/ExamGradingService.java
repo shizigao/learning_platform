@@ -1,3 +1,7 @@
+/* 文件职责：实现考试阅卷业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：试卷、考试、作答、阅卷、统计与错题；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.exam.service;
 
 import com.learningplatform.common.api.ErrorCode;
@@ -31,13 +35,24 @@ import java.util.Locale;
 import java.util.Set;
 
 @Service
+/**
+ * 实现考试阅卷业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ *
+ * <p>职责边界：业务状态变化在此集中完成；跨表写入需保持事务一致性。</p>
+ */
 public class ExamGradingService {
+    /** 委托考试执行对应领域规则。 */
     private final ExamService examService;
+    /** 访问答案持久化数据。 */
     private final ExamAnswerMapper answerMapper;
+    /** 访问作答持久化数据。 */
     private final ExamAttemptMapper attemptMapper;
+    /** 访问成绩持久化数据。 */
     private final ExamResultMapper resultMapper;
+    /** 委托presentation执行对应领域规则。 */
     private final ExamAnswerPresentationService presentationService;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public ExamGradingService(
             ExamService examService,
             ExamAnswerMapper answerMapper,
@@ -53,6 +68,7 @@ public class ExamGradingService {
     }
 
     @Transactional
+    /** 执行评分提交作答核心计算或业务处理，并保证失败不会留下不一致的持久化结果。 */
     public ExamAttempt gradeSubmittedAttempt(ExamAttempt attempt, Exam exam) {
         LocalDateTime gradedAt = now();
         for (ExamAnswer answer : answerMapper.findByAttemptId(attempt.getId())) {
@@ -66,6 +82,7 @@ public class ExamGradingService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR, "作答记录不存在"));
     }
 
+    /** 查询Attempts相关数据；只返回当前调用方有权查看的结果。 */
     public List<ExamGradingAttemptResponse> listAttempts(
             Long examId,
             Long requesterId,
@@ -77,6 +94,7 @@ public class ExamGradingService {
                 .toList();
     }
 
+    /** 查询目标相关数据；只返回当前调用方有权查看的结果。 */
     public ExamGradingDetailResponse detail(
             Long examId,
             Long attemptId,
@@ -93,6 +111,7 @@ public class ExamGradingService {
     }
 
     @Transactional
+    /** 执行评分答案核心计算或业务处理，并保证失败不会留下不一致的持久化结果。 */
     public ExamResultQuestionResponse gradeAnswer(
             Long examId,
             Long attemptId,
@@ -132,6 +151,7 @@ public class ExamGradingService {
     }
 
     @Transactional
+    /** 执行完成状态流转，仅允许从合法前置状态进入目标状态。 */
     public ExamResultSummaryResponse completeReview(
             Long examId,
             Long attemptId,
@@ -151,6 +171,7 @@ public class ExamGradingService {
         return ExamResultSummaryResponse.from(result, questions);
     }
 
+    /** 执行评分Automatically核心计算或业务处理，并保证失败不会留下不一致的持久化结果。 */
     private void gradeAutomatically(ExamAnswer answer, LocalDateTime gradedAt) {
         List<String> values = presentationService.readValues(answer.getAnswerJson());
         boolean unanswered = answer.getQuestionType() == QuestionType.SHORT_ANSWER
@@ -178,6 +199,7 @@ public class ExamGradingService {
         }
     }
 
+    /** 执行评分Choice核心计算或业务处理，并保证失败不会留下不一致的持久化结果。 */
     private void gradeChoice(ExamAnswer answer, List<String> values, LocalDateTime gradedAt) {
         QuestionAnswer expected = presentationService.readCorrectAnswer(answer.getAnswerSnapshot());
         Set<String> actualValues = new HashSet<>(values);
@@ -194,6 +216,7 @@ public class ExamGradingService {
         );
     }
 
+    /** 执行评分FillBlank核心计算或业务处理，并保证失败不会留下不一致的持久化结果。 */
     private void gradeFillBlank(ExamAnswer answer, List<String> values, LocalDateTime gradedAt) {
         QuestionAnswer expected = presentationService.readCorrectAnswer(answer.getAnswerSnapshot());
         int total = expected.acceptedAnswers().size();
@@ -220,12 +243,14 @@ public class ExamGradingService {
         applyGrade(answer, score, correct, ExamAnswerGradingStatus.AUTO_GRADED, gradedAt);
     }
 
+    /** 执行 equalsFillAnswer 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private boolean equalsFillAnswer(String actual, String expected, boolean caseSensitive) {
         return caseSensitive
                 ? actual.equals(expected)
                 : actual.toLowerCase(Locale.ROOT).equals(expected.toLowerCase(Locale.ROOT));
     }
 
+    /** 执行 applyGrade 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private void applyGrade(
             ExamAnswer answer,
             BigDecimal score,
@@ -239,6 +264,7 @@ public class ExamGradingService {
         answer.setGradedAt(gradedAt);
     }
 
+    /** 更新成绩，通过返回值或版本条件识别并发状态变化。 */
     private ExamResult refreshResult(ExamAttempt attempt, Exam exam, boolean allowCompletion) {
         List<ExamAnswer> answers = answerMapper.findByAttemptId(attempt.getId());
         BigDecimal objectiveScore = sumByStatus(answers, ExamAnswerGradingStatus.AUTO_GRADED);
@@ -297,6 +323,7 @@ public class ExamGradingService {
         return result;
     }
 
+    /** 执行 sumByStatus 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private BigDecimal sumByStatus(
             List<ExamAnswer> answers,
             ExamAnswerGradingStatus status
@@ -309,6 +336,7 @@ public class ExamGradingService {
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
+    /** 校验授权及相关业务前置条件，不满足时抛出明确业务异常。 */
     private Exam requireAuthorization(
             Long examId,
             Long requesterId,
@@ -318,10 +346,12 @@ public class ExamGradingService {
         return examService.getRequired(examId);
     }
 
+    /** 执行 authorize 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private Exam authorize(Long examId, Long requesterId, boolean requesterAdmin) {
         return requireAuthorization(examId, requesterId, requesterAdmin);
     }
 
+    /** 校验Reviewable作答及相关业务前置条件，不满足时抛出明确业务异常。 */
     private ExamAttempt requireReviewableAttempt(Long examId, Long attemptId) {
         ExamAttempt attempt = attemptMapper.findByIdForUpdate(attemptId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "作答记录不存在"));
@@ -337,6 +367,7 @@ public class ExamGradingService {
         return attempt;
     }
 
+    /** 校验作答Meta及相关业务前置条件，不满足时抛出明确业务异常。 */
     private ExamAttempt requireAttemptMeta(Long examId, Long attemptId) {
         return attemptMapper.findSubmittedByExam(examId).stream()
                 .filter(attempt -> attempt.getId().equals(attemptId))
@@ -344,10 +375,12 @@ public class ExamGradingService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "作答记录不存在"));
     }
 
+    /** 转换或规范化数据，不引入额外持久化副作用。 */
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    /** 执行 now 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private LocalDateTime now() {
         return LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS);
     }

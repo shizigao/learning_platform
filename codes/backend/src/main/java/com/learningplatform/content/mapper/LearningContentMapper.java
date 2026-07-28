@@ -1,3 +1,7 @@
+/* 文件职责：定义学习资料的 MyBatis 查询和写入操作，是业务服务访问数据库的持久化端口。
+ * 所属模块：学习资料、分类、文件、审核与访问控制；所在分层：MyBatis 持久化层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.content.mapper;
 
 import com.learningplatform.content.domain.ContentStatus;
@@ -15,7 +19,13 @@ import java.util.List;
 import java.util.Optional;
 
 @Mapper
+/**
+ * 定义学习资料的 MyBatis 查询和写入操作，是业务服务访问数据库的持久化端口。
+ *
+ * <p>职责边界：只表达数据库读写语义，不在 SQL 映射层做权限和业务决策。</p>
+ */
 public interface LearningContentMapper {
+    /** 复用学习资料查询列，保证不同查询返回一致字段集合。 */
     String COLUMNS = """
             lc.id, lc.publisher_id, publisher.nickname AS publisher_name,
             lc.category_id, category.name AS category_name,
@@ -34,6 +44,7 @@ public interface LearningContentMapper {
             LEFT JOIN content_category category ON category.id = lc.category_id
             WHERE lc.id = #{id} AND lc.deleted = 0
             """)
+    /** 执行 findById 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<LearningContent> findById(Long id);
 
     @Insert("""
@@ -46,6 +57,7 @@ public interface LearningContentMapper {
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
+    /** 插入新记录，并返回受影响行数；配置生成主键时同时回填实体 ID。 */
     int insert(LearningContent content);
 
     @Update("""
@@ -63,6 +75,7 @@ public interface LearningContentMapper {
             WHERE id = #{id} AND publisher_id = #{publisherId} AND deleted = 0
               AND status IN ('DRAFT', 'REJECTED')
             """)
+    /** 执行 updateEditable 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int updateEditable(LearningContent content);
 
     @Update("""
@@ -70,6 +83,7 @@ public interface LearningContentMapper {
             SET cover_file_id = #{fileId}
             WHERE id = #{contentId} AND deleted = 0
             """)
+    /** 执行 updateCoverFileId 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int updateCoverFileId(@Param("contentId") Long contentId, @Param("fileId") Long fileId);
 
     @Update("""
@@ -78,6 +92,7 @@ public interface LearningContentMapper {
             WHERE id = #{id} AND publisher_id = #{publisherId} AND deleted = 0
               AND status IN ('DRAFT', 'REJECTED')
             """)
+    /** 执行 submit 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int submit(
             @Param("id") Long id,
             @Param("publisherId") Long publisherId,
@@ -89,6 +104,7 @@ public interface LearningContentMapper {
             SET status = 'PUBLISHED', rejection_reason = NULL, published_at = #{publishedAt}
             WHERE id = #{id} AND deleted = 0 AND status = 'PENDING_REVIEW'
             """)
+    /** 执行 approve 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int approve(@Param("id") Long id, @Param("publishedAt") LocalDateTime publishedAt);
 
     @Update("""
@@ -96,6 +112,7 @@ public interface LearningContentMapper {
             SET status = 'REJECTED', rejection_reason = #{reason}
             WHERE id = #{id} AND deleted = 0 AND status = 'PENDING_REVIEW'
             """)
+    /** 执行 reject 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int reject(@Param("id") Long id, @Param("reason") String reason);
 
     @Update("""
@@ -103,6 +120,7 @@ public interface LearningContentMapper {
             SET status = 'OFFLINE'
             WHERE id = #{id} AND deleted = 0 AND status = 'PUBLISHED'
             """)
+    /** 执行 takeOffline 对应的数据库操作；写操作返回受影响行数供服务层判断状态。 */
     int takeOffline(Long id);
 
     @Update("""
@@ -110,6 +128,7 @@ public interface LearningContentMapper {
             SET status = 'PUBLISHED', published_at = #{publishedAt}
             WHERE id = #{id} AND deleted = 0 AND status = 'OFFLINE'
             """)
+    /** 执行 republish 对应的数据库操作；写操作返回受影响行数供服务层判断状态。 */
     int republish(@Param("id") Long id, @Param("publishedAt") LocalDateTime publishedAt);
 
     @Update("""
@@ -118,6 +137,7 @@ public interface LearningContentMapper {
             WHERE id = #{id} AND publisher_id = #{publisherId} AND deleted = 0
               AND status IN ('DRAFT', 'REJECTED')
             """)
+    /** 执行 softDelete 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int softDelete(@Param("id") Long id, @Param("publisherId") Long publisherId);
 
     @Update("""
@@ -125,6 +145,7 @@ public interface LearningContentMapper {
             SET view_count = view_count + 1
             WHERE id = #{id} AND deleted = 0 AND status = 'PUBLISHED'
             """)
+    /** 执行 incrementViewCount 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int incrementViewCount(Long id);
 
     @Update("""
@@ -132,6 +153,7 @@ public interface LearningContentMapper {
             SET like_count = like_count + 1
             WHERE id = #{id} AND deleted = 0 AND status = 'PUBLISHED'
             """)
+    /** 执行 incrementLikeCount 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int incrementLikeCount(Long id);
 
     @Update("""
@@ -139,6 +161,7 @@ public interface LearningContentMapper {
             SET like_count = GREATEST(like_count - 1, 0)
             WHERE id = #{id} AND deleted = 0
             """)
+    /** 执行 decrementLikeCount 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int decrementLikeCount(Long id);
 
     @Update("""
@@ -146,6 +169,7 @@ public interface LearningContentMapper {
             SET favorite_count = favorite_count + 1
             WHERE id = #{id} AND deleted = 0 AND status = 'PUBLISHED'
             """)
+    /** 执行 incrementFavoriteCount 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int incrementFavoriteCount(Long id);
 
     @Update("""
@@ -153,6 +177,7 @@ public interface LearningContentMapper {
             SET favorite_count = GREATEST(favorite_count - 1, 0)
             WHERE id = #{id} AND deleted = 0
             """)
+    /** 执行 decrementFavoriteCount 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int decrementFavoriteCount(Long id);
 
     @Update("""
@@ -160,6 +185,7 @@ public interface LearningContentMapper {
             SET comment_count = comment_count + 1
             WHERE id = #{id} AND deleted = 0 AND status = 'PUBLISHED'
             """)
+    /** 执行 incrementCommentCount 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int incrementCommentCount(Long id);
 
     @Select("""
@@ -173,6 +199,7 @@ public interface LearningContentMapper {
             <if test='free != null'>AND is_free = #{free}</if>
             </script>
             """)
+    /** 执行 countPublished 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     long countPublished(
             @Param("keyword") String keyword,
             @Param("categoryId") Long categoryId,
@@ -196,6 +223,7 @@ public interface LearningContentMapper {
             LIMIT #{limit} OFFSET #{offset}
             </script>
             """)
+    /** 执行 findPublished 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     List<LearningContent> findPublished(
             @Param("keyword") String keyword,
             @Param("categoryId") Long categoryId,
@@ -213,6 +241,7 @@ public interface LearningContentMapper {
               AND status = 'PUBLISHED'
               AND distribution_mode = 'PUBLIC'
             """)
+    /** 执行 countPublicByPublisher 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     long countPublicByPublisher(Long publisherId);
 
     @Select("""
@@ -228,6 +257,7 @@ public interface LearningContentMapper {
             ORDER BY lc.published_at DESC, lc.id DESC
             LIMIT #{limit} OFFSET #{offset}
             """)
+    /** 执行 findPublicByPublisher 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     List<LearningContent> findPublicByPublisher(
             @Param("publisherId") Long publisherId,
             @Param("offset") long offset,
@@ -245,6 +275,7 @@ public interface LearningContentMapper {
               AND status = 'PUBLISHED'
               AND distribution_mode = 'PUBLIC'
             """)
+    /** 执行 publicationStats 对应的数据库操作；写操作返回受影响行数供服务层判断状态。 */
     com.learningplatform.content.domain.ContentPublicationStats publicationStats(Long publisherId);
 
     @Select("""
@@ -262,6 +293,7 @@ public interface LearningContentMapper {
             <if test='excludeContentId != null'>AND lc.id != #{excludeContentId}</if>
             </script>
             """)
+    /** 执行 countReferenceCandidates 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     long countReferenceCandidates(
             @Param("titleKeyword") String titleKeyword,
             @Param("publisherKeyword") String publisherKeyword,
@@ -287,6 +319,7 @@ public interface LearningContentMapper {
             LIMIT #{limit} OFFSET #{offset}
             </script>
             """)
+    /** 执行 findReferenceCandidates 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     List<LearningContent> findReferenceCandidates(
             @Param("titleKeyword") String titleKeyword,
             @Param("publisherKeyword") String publisherKeyword,
@@ -304,6 +337,7 @@ public interface LearningContentMapper {
             <if test='keyword != null'>AND title LIKE CONCAT('%', #{keyword}, '%')</if>
             </script>
             """)
+    /** 执行 countByPublisher 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     long countByPublisher(
             @Param("publisherId") Long publisherId,
             @Param("status") ContentStatus status,
@@ -324,6 +358,7 @@ public interface LearningContentMapper {
             LIMIT #{limit} OFFSET #{offset}
             </script>
             """)
+    /** 执行 findByPublisher 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     List<LearningContent> findByPublisher(
             @Param("publisherId") Long publisherId,
             @Param("status") ContentStatus status,
@@ -341,6 +376,7 @@ public interface LearningContentMapper {
             <if test='keyword != null'>AND title LIKE CONCAT('%', #{keyword}, '%')</if>
             </script>
             """)
+    /** 执行 countForAdmin 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     long countForAdmin(
             @Param("status") ContentStatus status,
             @Param("keyword") String keyword
@@ -363,6 +399,7 @@ public interface LearningContentMapper {
             LIMIT #{limit} OFFSET #{offset}
             </script>
             """)
+    /** 执行 findForAdmin 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     List<LearningContent> findForAdmin(
             @Param("status") ContentStatus status,
             @Param("keyword") String keyword,

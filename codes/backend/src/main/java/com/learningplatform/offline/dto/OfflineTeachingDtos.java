@@ -1,3 +1,7 @@
+/* 文件职责：表示线下教学教学Dtos领域对象或组件，封装该概念相关的数据和行为。
+ * 所属模块：线下教师申请、审核、检索与推荐；所在分层：接口数据契约层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.offline.dto;
 
 import com.learningplatform.ai.dto.AiTaskResponse;
@@ -16,10 +20,17 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * 表示线下教学教学Dtos领域对象或组件，封装该概念相关的数据和行为。
+ *
+ * <p>职责边界：字段与 JSON 契约保持一致，不承载数据库连接或外部副作用。</p>
+ */
 public final class OfflineTeachingDtos {
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     private OfflineTeachingDtos() {
     }
 
+    /** 执行 TeacherApplicationRequest 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     public record TeacherApplicationRequest(
             @NotBlank @Size(max = 64) String teacherName,
             @NotBlank
@@ -53,6 +64,7 @@ public final class OfflineTeachingDtos {
     ) {
     }
 
+    /** 执行 TeacherApplicationResponse 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     public record TeacherApplicationResponse(
             Long id,
             Long userId,
@@ -83,6 +95,7 @@ public final class OfflineTeachingDtos {
     ) {
     }
 
+    /** 执行 TeacherApplicationSummary 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     public record TeacherApplicationSummary(
             Long id,
             Long userId,
@@ -100,6 +113,7 @@ public final class OfflineTeachingDtos {
     ) {
     }
 
+    /** 执行 TeacherProfileResponse 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     public record TeacherProfileResponse(
             Long id,
             Long userId,
@@ -129,11 +143,13 @@ public final class OfflineTeachingDtos {
     ) {
     }
 
+    /** 执行 ReviewRequest 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     public record ReviewRequest(
             @Size(max = 1000) String reason
     ) {
     }
 
+    /** 执行 StudentPreferenceRequest 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     public record StudentPreferenceRequest(
             @NotBlank @Size(max = 200) String subject,
             @NotBlank @Size(max = 500) String currentLevel,
@@ -149,12 +165,14 @@ public final class OfflineTeachingDtos {
     ) {
     }
 
+    /** 执行推荐生成请求核心计算或业务处理，并保证失败不会留下不一致的持久化结果。 */
     public record RecommendationGenerateRequest(
             @NotBlank @Size(max = 64) String requestId,
             @Valid StudentPreferenceRequest preference
     ) {
     }
 
+    /** 执行 TeacherRecommendationItem 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     public record TeacherRecommendationItem(
             TeacherProfileResponse teacher,
             String reason,
@@ -163,6 +181,7 @@ public final class OfflineTeachingDtos {
     ) {
     }
 
+    /** 执行 TeacherRecommendationResponse 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     public record TeacherRecommendationResponse(
             boolean aiSucceeded,
             String message,

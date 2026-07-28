@@ -1,3 +1,7 @@
+/* 文件职责：实现模拟支付业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：商品、订单、支付模拟与用户权益；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.order.service;
 
 import com.learningplatform.common.api.ErrorCode;
@@ -19,13 +23,24 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
 @Service
+/**
+ * 实现模拟支付业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ *
+ * <p>职责边界：业务状态变化在此集中完成；跨表写入需保持事务一致性。</p>
+ */
 public class MockPaymentService {
+    /** 访问订单持久化数据。 */
     private final OrderMapper orderMapper;
+    /** 访问支付持久化数据。 */
     private final PaymentRecordMapper paymentMapper;
+    /** 委托订单执行对应领域规则。 */
     private final OrderService orderService;
+    /** 委托权益执行对应领域规则。 */
     private final EntitlementService entitlementService;
+    /** 保存numberGenerator，供该类型的业务逻辑读取或更新。 */
     private final BusinessNumberGenerator numberGenerator;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public MockPaymentService(
             OrderMapper orderMapper,
             PaymentRecordMapper paymentMapper,
@@ -41,6 +56,7 @@ public class MockPaymentService {
     }
 
     @Transactional
+    /** 执行 pay 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public MockPaymentResponse pay(Long orderId, Long userId) {
         Order order = orderService.requireOwnedForUpdate(orderId, userId);
         if (order.getStatus() == OrderStatus.PAID) {
@@ -88,6 +104,7 @@ public class MockPaymentService {
         return response(orderId, userId, payment);
     }
 
+    /** 执行 response 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private MockPaymentResponse response(
             Long orderId,
             Long userId,

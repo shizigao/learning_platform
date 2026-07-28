@@ -1,3 +1,7 @@
+/* 文件职责：定义学习资料Write请求接口的请求字段和 Bean Validation 约束。
+ * 所属模块：学习资料、分类、文件、审核与访问控制；所在分层：接口数据契约层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.content.dto;
 
 import com.learningplatform.content.domain.ContentType;
@@ -11,6 +15,11 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.List;
 
+/**
+ * 定义学习资料Write请求接口的请求字段和 Bean Validation 约束。
+ *
+ * <p>职责边界：字段与 JSON 契约保持一致，不承载数据库连接或外部副作用。</p>
+ */
 public record ContentWriteRequest(
         @NotNull(message = "资料分类不能为空")
         @Min(value = 1, message = "资料分类ID必须为正数")
@@ -39,6 +48,7 @@ public record ContentWriteRequest(
         @DecimalMin(value = "0.00", message = "价格不能为负数")
         BigDecimal price
 ) {
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public ContentWriteRequest(
             Long categoryId,
             String title,

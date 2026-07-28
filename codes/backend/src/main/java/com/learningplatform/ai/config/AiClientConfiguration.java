@@ -1,3 +1,7 @@
+/* 文件职责：装配AI 客户端配置运行配置和依赖组件，并对关键配置项执行启动期校验。
+ * 所属模块：AI 任务、对话、分析与供应商调用；所在分层：配置装配层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.ai.config;
 
 import com.learningplatform.ai.client.AiClient;
@@ -13,12 +17,18 @@ import org.springframework.context.annotation.Configuration;
 import java.util.Locale;
 
 @Configuration(proxyBeanMethods = false)
+/**
+ * 装配AI 客户端配置运行配置和依赖组件，并对关键配置项执行启动期校验。
+ *
+ * <p>职责边界：只负责组件装配和配置校验，不承载具体业务流程。</p>
+ */
 public class AiClientConfiguration {
     private static final Logger LOGGER = LoggerFactory.getLogger(
             AiClientConfiguration.class
     );
 
     @Bean
+    /** 执行 aiClient 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     public AiClient aiClient(AiProperties properties) {
         String provider = properties.provider() == null
                 ? "mock"
@@ -35,6 +45,7 @@ public class AiClientConfiguration {
         return client;
     }
 
+    /** 执行 logActiveConfiguration 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private void logActiveConfiguration(
             AiClient client,
             AiProperties properties
@@ -70,10 +81,12 @@ public class AiClientConfiguration {
         );
     }
 
+    /** 执行 safe 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private String safe(String value) {
         return value == null || value.isBlank() ? "-" : value.trim();
     }
 
+    /** 执行 safeBaseUrl 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private String safeBaseUrl(String value) {
         String normalized = safe(value);
         int query = normalized.indexOf('?');
@@ -89,12 +102,14 @@ public class AiClientConfiguration {
         return normalized.replaceFirst("://[^/@]+@", "://");
     }
 
+    /** 执行 mockModel 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private String mockModel(AiProperties properties) {
         return properties.mock() == null
                 ? "mock-learning-assistant-v1"
                 : properties.mock().model();
     }
 
+    /** 执行 mockClient 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private MockAiClient mockClient(AiProperties properties) {
         AiProperties.MockProvider mock = properties.mock();
         return new MockAiClient(

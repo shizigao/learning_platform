@@ -1,3 +1,7 @@
+/* 文件职责：实现考试答案业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：试卷、考试、作答、阅卷、统计与错题；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.exam.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -30,13 +34,24 @@ import java.util.Map;
 import java.util.Set;
 
 @Service
+/**
+ * 实现考试答案业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ *
+ * <p>职责边界：业务状态变化在此集中完成；跨表写入需保持事务一致性。</p>
+ */
 public class ExamAnswerService {
+    /** 访问作答持久化数据。 */
     private final ExamAttemptMapper attemptMapper;
+    /** 访问试卷题目持久化数据。 */
     private final ExamPaperQuestionMapper paperQuestionMapper;
+    /** 访问答案持久化数据。 */
     private final ExamAnswerMapper answerMapper;
+    /** 委托运行态State执行对应领域规则。 */
     private final ExamRuntimeStateService runtimeStateService;
+    /** 访问object持久化数据。 */
     private final ObjectMapper objectMapper;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public ExamAnswerService(
             ExamAttemptMapper attemptMapper,
             ExamPaperQuestionMapper paperQuestionMapper,
@@ -52,6 +67,7 @@ public class ExamAnswerService {
     }
 
     @Transactional
+    /** 创建或初始化And列表，并维护唯一性、初始状态和必要关联。 */
     public List<ExamAnswerResponse> initializeAndList(
             ExamAttempt attempt,
             Long paperId,
@@ -70,6 +86,7 @@ public class ExamAnswerService {
     }
 
     @Transactional
+    /** 更新One，通过返回值或版本条件识别并发状态变化。 */
     public ExamAnswerResponse saveOne(
             Long examId,
             Long userId,
@@ -91,6 +108,7 @@ public class ExamAnswerService {
     }
 
     @Transactional
+    /** 更新Batch，通过返回值或版本条件识别并发状态变化。 */
     public List<ExamAnswerResponse> saveBatch(
             Long examId,
             Long userId,
@@ -120,12 +138,14 @@ public class ExamAnswerService {
         return List.copyOf(responses);
     }
 
+    /** 查询Responses相关数据；只返回当前调用方有权查看的结果。 */
     public List<ExamAnswerResponse> listResponses(Long attemptId) {
         return answerMapper.findByAttemptId(attemptId).stream()
                 .map(this::response)
                 .toList();
     }
 
+    /** 校验Writable作答及相关业务前置条件，不满足时抛出明确业务异常。 */
     private ExamAttempt requireWritableAttempt(Long examId, Long userId) {
         ExamAttempt attempt = attemptMapper.findFirstForUpdate(examId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CONFLICT, "请先开始考试"));
@@ -138,6 +158,7 @@ public class ExamAnswerService {
         return attempt;
     }
 
+    /** 执行 applyAnswer 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private void applyAnswer(
             ExamAnswer answer,
             ExamAnswerWriteRequest request,
@@ -155,6 +176,7 @@ public class ExamAnswerService {
         answer.setSavedAt(savedAt);
     }
 
+    /** 校验及相关业务前置条件，不满足时抛出明确业务异常。 */
     private void validate(ExamAnswer answer, List<String> values, String text) {
         QuestionType type = answer.getQuestionType();
         if (type == QuestionType.SHORT_ANSWER) {
@@ -193,6 +215,7 @@ public class ExamAnswerService {
         }
     }
 
+    /** 执行 optionKeys 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private Set<String> optionKeys(String optionsSnapshot) {
         if (optionsSnapshot == null || optionsSnapshot.isBlank()) {
             return Set.of();
@@ -209,6 +232,7 @@ public class ExamAnswerService {
         }
     }
 
+    /** 执行 blankCount 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private int blankCount(String answerSnapshot) {
         try {
             return objectMapper.readTree(answerSnapshot)
@@ -219,6 +243,7 @@ public class ExamAnswerService {
         }
     }
 
+    /** 转换或规范化Values数据，不引入额外持久化副作用。 */
     private List<String> normalizeValues(List<String> source) {
         List<String> values = new ArrayList<>();
         for (String value : source) {
@@ -231,6 +256,7 @@ public class ExamAnswerService {
         return List.copyOf(values);
     }
 
+    /** 转换或规范化Text数据，不引入额外持久化副作用。 */
     private String normalizeText(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -242,6 +268,7 @@ public class ExamAnswerService {
         return normalized;
     }
 
+    /** 执行 encode 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private String encode(List<String> values) {
         try {
             return objectMapper.writeValueAsString(Map.of("values", values));
@@ -250,6 +277,7 @@ public class ExamAnswerService {
         }
     }
 
+    /** 执行 decode 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private List<String> decode(String answerJson) {
         if (answerJson == null || answerJson.isBlank()) {
             return List.of();
@@ -264,12 +292,14 @@ public class ExamAnswerService {
         }
     }
 
+    /** 执行 persist 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private void persist(ExamAnswer answer) {
         if (answerMapper.updateAnswer(answer) != 1) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "保存答案失败");
         }
     }
 
+    /** 执行 response 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private ExamAnswerResponse response(ExamAnswer answer) {
         return new ExamAnswerResponse(
                 answer.getId(),
@@ -282,10 +312,12 @@ public class ExamAnswerService {
         );
     }
 
+    /** 执行 now 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private LocalDateTime now() {
         return LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS);
     }
 
+    /** 执行 invalid 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private BusinessException invalid(String message) {
         return new BusinessException(ErrorCode.BAD_REQUEST, message);
     }

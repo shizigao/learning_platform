@@ -1,3 +1,7 @@
+/* 文件职责：定义Api响应接口的只读返回契约，避免直接暴露数据库实体。
+ * 所属模块：统一协议、异常、配置与跨领域基础设施；所在分层：模块根目录。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.common.api;
 
 import org.slf4j.MDC;

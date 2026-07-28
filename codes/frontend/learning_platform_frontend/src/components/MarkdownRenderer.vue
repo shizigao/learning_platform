@@ -48,6 +48,7 @@ async function resolveResources(): Promise<void> {
     try {
       const mode = reference.kind === 'image' ? 'preview' : 'download'
       const url = props.publisherMode
+        //getPublisherContentFileUrl函数向后端请求文件资源路径，点击
         ? await getPublisherContentFileUrl(props.contentId!, reference.fileId, mode)
         : await getContentFileUrl(props.contentId!, reference.fileId, mode)
       return { reference, url }
@@ -83,6 +84,7 @@ function handleClick(event: MouseEvent): void {
   void router.push(href)
 }
 
+// 监听器
 watch(
   () => [props.source, props.contentId, props.publisherMode] as const,
   () => void resolveResources(),

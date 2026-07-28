@@ -1,3 +1,7 @@
+/* 文件职责：实现考试答案Presentation业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：试卷、考试、作答、阅卷、统计与错题；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.exam.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -16,13 +20,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
+/**
+ * 实现考试答案Presentation业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ *
+ * <p>职责边界：业务状态变化在此集中完成；跨表写入需保持事务一致性。</p>
+ */
 public class ExamAnswerPresentationService {
+    /** 访问object持久化数据。 */
     private final ObjectMapper objectMapper;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public ExamAnswerPresentationService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
+    /** 执行 response 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public ExamResultQuestionResponse response(ExamAnswer answer, boolean revealAnswer) {
         return new ExamResultQuestionResponse(
                 answer.getId(),
@@ -43,6 +55,7 @@ public class ExamAnswerPresentationService {
         );
     }
 
+    /** 查询Values相关数据；只返回当前调用方有权查看的结果。 */
     public List<String> readValues(String answerJson) {
         if (answerJson == null || answerJson.isBlank()) {
             return List.of();
@@ -57,6 +70,7 @@ public class ExamAnswerPresentationService {
         }
     }
 
+    /** 查询Correct答案相关数据；只返回当前调用方有权查看的结果。 */
     public QuestionAnswer readCorrectAnswer(String snapshot) {
         try {
             JsonNode root = objectMapper.readTree(snapshot);
@@ -70,6 +84,7 @@ public class ExamAnswerPresentationService {
         }
     }
 
+    /** 执行 fillBlankAutoGradable 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public boolean fillBlankAutoGradable(ExamAnswer answer) {
         return snapshotBoolean(
                 answer.getAnswerSnapshot(),
@@ -78,6 +93,7 @@ public class ExamAnswerPresentationService {
         );
     }
 
+    /** 执行 caseSensitive 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public boolean caseSensitive(ExamAnswer answer) {
         return snapshotBoolean(
                 answer.getAnswerSnapshot(),
@@ -86,6 +102,7 @@ public class ExamAnswerPresentationService {
         );
     }
 
+    /** 查询Options相关数据；只返回当前调用方有权查看的结果。 */
     private List<QuestionOptionResponse> readOptions(String snapshot) {
         if (snapshot == null || snapshot.isBlank()) {
             return List.of();
@@ -101,6 +118,7 @@ public class ExamAnswerPresentationService {
         }
     }
 
+    /** 执行 snapshotBoolean 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private boolean snapshotBoolean(String snapshot, String field, boolean fallback) {
         try {
             JsonNode root = objectMapper.readTree(snapshot);
@@ -110,6 +128,7 @@ public class ExamAnswerPresentationService {
         }
     }
 
+    /** 执行 damaged 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private BusinessException damaged(String message) {
         return new BusinessException(ErrorCode.INTERNAL_ERROR, message);
     }

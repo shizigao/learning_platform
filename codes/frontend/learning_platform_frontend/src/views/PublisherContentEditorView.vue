@@ -116,6 +116,7 @@ function validateForm(): boolean {
   return !formErrors.categoryId && !formErrors.title && !formErrors.price && !formErrors.classIds
 }
 
+// 保存草稿
 async function save(): Promise<void> {
   if (!validateForm()) {
     ElMessage.warning('请修正表单中的错误后再保存')
@@ -131,9 +132,12 @@ async function save(): Promise<void> {
       isFree: form.distributionMode === 'CLASS' ? true : form.isFree,
       price: form.distributionMode === 'CLASS' || form.isFree ? 0 : Number(form.price),
     }
+    // 发送保存草稿请求到后端
     const saved = contentId.value
-      ? await updateContent(contentId.value, payload)
-      : await createContent(payload)
+      //点击updateContent
+    
+      ? await updateContent(contentId.value, payload) //更新，若没有则创建
+      : await createContent(payload) // 创建
     fill(saved)
     ElMessage.success('草稿已保存')
     if (!contentId.value) await router.replace(`/publisher/contents/${saved.id}/edit`)
@@ -165,6 +169,7 @@ function chooseFile(event: Event): void {
   selectedFile.value = file
 }
 
+// 上传文件
 async function upload(): Promise<void> {
   if (!contentId.value || !selectedFile.value) {
     ElMessage.warning(contentId.value ? '请选择文件' : '请先保存草稿')
@@ -178,6 +183,7 @@ async function upload(): Promise<void> {
   }
   uploading.value = true
   try {
+    // 点击uploadContentFile
     await uploadContentFile(contentId.value, fileRole.value, selectedFile.value)
     await refreshFiles()
     clearSelectedFile()

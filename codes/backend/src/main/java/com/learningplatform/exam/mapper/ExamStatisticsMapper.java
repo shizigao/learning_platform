@@ -1,3 +1,7 @@
+/* 文件职责：定义考试Statistics的 MyBatis 查询和写入操作，是业务服务访问数据库的持久化端口。
+ * 所属模块：试卷、考试、作答、阅卷、统计与错题；所在分层：MyBatis 持久化层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.exam.mapper;
 
 import com.learningplatform.exam.domain.ExamQuestionStatistics;
@@ -8,6 +12,11 @@ import org.apache.ibatis.annotations.Select;
 import java.util.List;
 
 @Mapper
+/**
+ * 定义考试Statistics的 MyBatis 查询和写入操作，是业务服务访问数据库的持久化端口。
+ *
+ * <p>职责边界：只表达数据库读写语义，不在 SQL 映射层做权限和业务决策。</p>
+ */
 public interface ExamStatisticsMapper {
     @Select("""
             SELECT COUNT(DISTINCT ec.id) AS total_candidates,
@@ -33,6 +42,7 @@ public interface ExamStatisticsMapper {
             LEFT JOIN exam_result r ON r.attempt_id = a.id
             WHERE ec.exam_id = #{examId}
             """)
+    /** 执行 summary 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     ExamStatisticsSummary summary(Long examId);
 
     @Select("""
@@ -60,5 +70,6 @@ public interface ExamStatisticsMapper {
                      pq.question_type_snapshot, pq.stem_snapshot, pq.score
             ORDER BY pq.sort_order ASC, pq.id ASC
             """)
+    /** 执行 questionStatistics 对应的数据库操作；写操作返回受影响行数供服务层判断状态。 */
     List<ExamQuestionStatistics> questionStatistics(Long examId);
 }

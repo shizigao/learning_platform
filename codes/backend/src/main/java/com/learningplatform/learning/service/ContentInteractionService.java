@@ -1,3 +1,7 @@
+/* 文件职责：实现学习资料Interaction业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：学习进度、点赞、收藏与评论；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.learning.service;
 
 import com.learningplatform.common.api.ErrorCode;
@@ -24,13 +28,24 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
+/**
+ * 实现学习资料Interaction业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ *
+ * <p>职责边界：业务状态变化在此集中完成；跨表写入需保持事务一致性。</p>
+ */
 public class ContentInteractionService {
+    /** 访问学习资料持久化数据。 */
     private final LearningContentMapper contentMapper;
+    /** 访问interaction持久化数据。 */
     private final ContentInteractionMapper interactionMapper;
+    /** 访问评论持久化数据。 */
     private final ContentCommentMapper commentMapper;
+    /** 委托访问权执行对应领域规则。 */
     private final ContentAccessService accessService;
+    /** 委托学习资料执行对应领域规则。 */
     private final LearningContentService contentService;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public ContentInteractionService(
             LearningContentMapper contentMapper,
             ContentInteractionMapper interactionMapper,
@@ -45,6 +60,7 @@ public class ContentInteractionService {
         this.contentService = contentService;
     }
 
+    /** 执行 state 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public ContentReactionResponse state(
             Long contentId,
             Long userId,
@@ -54,6 +70,7 @@ public class ContentInteractionService {
         return response(content, userId);
     }
 
+    /** 执行 favorites 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public List<ContentSummaryResponse> favorites(Long userId) {
         return interactionMapper.findFavoriteContentIds(userId).stream()
                 .map(contentMapper::findById)
@@ -64,6 +81,7 @@ public class ContentInteractionService {
     }
 
     @Transactional
+    /** 执行 like 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public ContentReactionResponse like(Long contentId, Long userId, boolean requesterAdmin) {
         LearningContent content = accessService.requireAccess(contentId, userId, requesterAdmin);
         if (interactionMapper.hasLiked(userId, contentId)) {
@@ -82,6 +100,7 @@ public class ContentInteractionService {
     }
 
     @Transactional
+    /** 执行 unlike 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public ContentReactionResponse unlike(
             Long contentId,
             Long userId,
@@ -97,6 +116,7 @@ public class ContentInteractionService {
     }
 
     @Transactional
+    /** 执行 favorite 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public ContentReactionResponse favorite(
             Long contentId,
             Long userId,
@@ -119,6 +139,7 @@ public class ContentInteractionService {
     }
 
     @Transactional
+    /** 执行 unfavorite 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public ContentReactionResponse unfavorite(
             Long contentId,
             Long userId,
@@ -134,6 +155,7 @@ public class ContentInteractionService {
     }
 
     @Transactional
+    /** 执行 comment 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public ContentCommentResponse comment(
             Long contentId,
             Long userId,
@@ -163,6 +185,7 @@ public class ContentInteractionService {
         );
     }
 
+    /** 执行 comments 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public PageResult<ContentCommentResponse> comments(
             Long contentId,
             Long userId,
@@ -177,6 +200,7 @@ public class ContentInteractionService {
         return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
     }
 
+    /** 返回发布。 */
     private LearningContent getPublished(Long contentId) {
         LearningContent content = contentMapper.findById(contentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "学习资料不存在"));
@@ -186,6 +210,7 @@ public class ContentInteractionService {
         return content;
     }
 
+    /** 返回InteractionVisible。 */
     private LearningContent getInteractionVisible(
             Long contentId,
             Long userId,
@@ -198,6 +223,7 @@ public class ContentInteractionService {
         return content;
     }
 
+    /** 执行 response 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private ContentReactionResponse response(LearningContent content, Long userId) {
         return new ContentReactionResponse(
                 interactionMapper.hasLiked(userId, content.getId()),
@@ -207,10 +233,12 @@ public class ContentInteractionService {
         );
     }
 
+    /** 执行 valueOrZero 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private long valueOrZero(Long value) {
         return value == null ? 0 : value;
     }
 
+    /** 执行 conflict 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private BusinessException conflict(String message) {
         return new BusinessException(ErrorCode.CONFLICT, message);
     }

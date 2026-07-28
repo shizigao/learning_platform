@@ -1,3 +1,7 @@
+/* 文件职责：校验文件上传校验器的格式和业务不变量，失败时返回明确错误。
+ * 所属模块：学习资料、分类、文件、审核与访问控制；所在分层：对象存储层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.content.storage;
 
 import com.learningplatform.common.api.ErrorCode;
@@ -11,7 +15,13 @@ import java.util.Map;
 import java.util.Set;
 
 @Component
+/**
+ * 校验文件上传校验器的格式和业务不变量，失败时返回明确错误。
+ *
+ * <p>职责边界：对象存储保持私有，外部访问只能使用受控的短期签名地址。</p>
+ */
 public class FileUploadValidator {
+    /** 定义 MEBIBYTE 常量，统一该组件使用的固定规则或默认值。 */
     private static final long MEBIBYTE = 1024L * 1024L;
     private static final Map<ContentFileRole, Integer> ROLE_FILE_LIMITS = Map.of(
             ContentFileRole.COVER, 1,
@@ -74,12 +84,15 @@ public class FileUploadValidator {
             )
     );
 
+    /** 保存配置属性，供该类型的业务逻辑读取或更新。 */
     private final UploadProperties properties;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public FileUploadValidator(UploadProperties properties) {
         this.properties = properties;
     }
 
+    /** 校验及相关业务前置条件，不满足时抛出明确业务异常。 */
     public ValidatedUploadFile validate(FileUploadValidationRequest request) {
         if (request == null || request.fileRole() == null) {
             throw badRequest("文件用途不能为空");
@@ -102,6 +115,7 @@ public class FileUploadValidator {
         );
     }
 
+    /** 校验Owner及相关业务前置条件，不满足时抛出明确业务异常。 */
     private void validateOwner(FileUploadValidationRequest request) {
         if (request.resourceOwnerId() <= 0 || request.requesterUserId() <= 0) {
             throw badRequest("资源所有者或当前用户无效");
@@ -111,6 +125,7 @@ public class FileUploadValidator {
         }
     }
 
+    /** 校验Counts及相关业务前置条件，不满足时抛出明确业务异常。 */
     private void validateCounts(FileUploadValidationRequest request) {
         if (request.existingFileCount() < 0 || request.existingRoleFileCount() < 0) {
             throw badRequest("现有文件数量无效");
@@ -124,6 +139,7 @@ public class FileUploadValidator {
         }
     }
 
+    /** 转换或规范化Filename数据，不引入额外持久化副作用。 */
     private String normalizeFilename(String originalFilename) {
         if (originalFilename == null || originalFilename.isBlank()) {
             throw badRequest("文件名不能为空");
@@ -136,6 +152,7 @@ public class FileUploadValidator {
         return filename;
     }
 
+    /** 执行 extractExtension 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private String extractExtension(String filename) {
         int dotIndex = filename.lastIndexOf('.');
         if (dotIndex <= 0 || dotIndex == filename.length() - 1) {
@@ -148,6 +165,7 @@ public class FileUploadValidator {
         return extension;
     }
 
+    /** 转换或规范化Mime类型数据，不引入额外持久化副作用。 */
     private String normalizeMimeType(String mimeType) {
         if (mimeType == null || mimeType.isBlank()) {
             throw badRequest("文件 MIME 类型不能为空");
@@ -155,6 +173,7 @@ public class FileUploadValidator {
         return mimeType.split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
     }
 
+    /** 校验类型及相关业务前置条件，不满足时抛出明确业务异常。 */
     private void validateType(ContentFileRole role, String extension, String mimeType) {
         Set<String> allowedMimes = ALLOWED_TYPES.get(role).get(extension);
         if (allowedMimes == null || !allowedMimes.contains(mimeType)) {
@@ -162,6 +181,7 @@ public class FileUploadValidator {
         }
     }
 
+    /** 校验Size及相关业务前置条件，不满足时抛出明确业务异常。 */
     private void validateSize(ContentFileRole role, long sizeBytes) {
         if (sizeBytes <= 0) {
             throw badRequest("不能上传空文件");
@@ -173,6 +193,7 @@ public class FileUploadValidator {
         }
     }
 
+    /** 执行 badRequest 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private BusinessException badRequest(String message) {
         return new BusinessException(ErrorCode.BAD_REQUEST, message);
     }

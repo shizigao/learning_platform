@@ -1,3 +1,7 @@
+/* 文件职责：装配安全配置运行配置和依赖组件，并对关键配置项执行启动期校验。
+ * 所属模块：统一协议、异常、配置与跨领域基础设施；所在分层：配置装配层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.common.config;
 
 import com.learningplatform.auth.security.ApiAccessDeniedHandler;
@@ -24,9 +28,16 @@ import java.util.List;
 
 @Configuration
 @EnableMethodSecurity
+/**
+ * 装配安全配置运行配置和依赖组件，并对关键配置项执行启动期校验。
+ *
+ * <p>职责边界：只负责组件装配和配置校验，不承载具体业务流程。</p>
+ */
 public class SecurityConfig {
+    /** 保存cors配置属性，供该类型的业务逻辑读取或更新。 */
     private final CorsProperties corsProperties;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public SecurityConfig(CorsProperties corsProperties) {
         this.corsProperties = corsProperties;
     }
@@ -101,8 +112,10 @@ public class SecurityConfig {
     }
 
     private static final class TraceIdFilterHeader {
+        /** 定义 NAME 常量，统一该组件使用的固定规则或默认值。 */
         private static final String NAME = "X-Request-Id";
 
+        /** 执行 TraceIdFilterHeader 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
         private TraceIdFilterHeader() {
         }
     }

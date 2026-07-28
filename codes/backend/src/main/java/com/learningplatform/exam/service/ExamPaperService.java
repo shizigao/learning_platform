@@ -1,3 +1,7 @@
+/* 文件职责：实现考试试卷业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：试卷、考试、作答、阅卷、统计与错题；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.exam.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -33,17 +37,28 @@ import java.util.List;
 import java.util.Set;
 
 @Service
+/**
+ * 实现考试试卷业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ *
+ * <p>职责边界：业务状态变化在此集中完成；跨表写入需保持事务一致性。</p>
+ */
 public class ExamPaperService {
     private static final BigDecimal MAX_TOTAL_SCORE = new BigDecimal("999999.99");
+    /** 定义 OPTION_LIST_TYPE 常量，统一该组件使用的固定规则或默认值。 */
     private static final TypeReference<List<QuestionOptionResponse>> OPTION_LIST_TYPE =
             new TypeReference<>() {
             };
 
+    /** 访问试卷持久化数据。 */
     private final ExamPaperMapper paperMapper;
+    /** 访问试卷题目持久化数据。 */
     private final ExamPaperQuestionMapper paperQuestionMapper;
+    /** 委托题目执行对应领域规则。 */
     private final QuestionService questionService;
+    /** 访问object持久化数据。 */
     private final ObjectMapper objectMapper;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public ExamPaperService(
             ExamPaperMapper paperMapper,
             ExamPaperQuestionMapper paperQuestionMapper,
@@ -56,6 +71,7 @@ public class ExamPaperService {
         this.objectMapper = objectMapper;
     }
 
+    /** 查询目标相关数据；只返回当前调用方有权查看的结果。 */
     public PageResult<ExamPaperSummaryResponse> list(Long creatorId, ExamPaperListQuery query) {
         String keyword = normalize(query.getKeyword());
         long total = paperMapper.countByCreator(creatorId, query.getStatus(), keyword);
@@ -72,6 +88,7 @@ public class ExamPaperService {
     }
 
     @Transactional
+    /** 创建或初始化，并维护唯一性、初始状态和必要关联。 */
     public ExamPaperDetailResponse create(Long creatorId, ExamPaperWriteRequest request) {
         ExamPaper paper = new ExamPaper();
         paper.setCreatorId(creatorId);
@@ -84,6 +101,7 @@ public class ExamPaperService {
     }
 
     @Transactional
+    /** 更新，通过返回值或版本条件识别并发状态变化。 */
     public ExamPaperDetailResponse update(
             Long paperId,
             Long requesterId,
@@ -102,6 +120,7 @@ public class ExamPaperService {
     }
 
     @Transactional
+    /** 更新Questions，通过返回值或版本条件识别并发状态变化。 */
     public ExamPaperDetailResponse replaceQuestions(
             Long paperId,
             Long requesterId,
@@ -159,6 +178,7 @@ public class ExamPaperService {
         return detail(paperId, requesterId, requesterAdmin);
     }
 
+    /** 查询目标相关数据；只返回当前调用方有权查看的结果。 */
     public ExamPaperDetailResponse detail(
             Long paperId,
             Long requesterId,
@@ -173,6 +193,7 @@ public class ExamPaperService {
         return new ExamPaperDetailResponse(ExamPaperSummaryResponse.from(paper), questions);
     }
 
+    /** 判断是否满足didateQuestions条件，不修改持久化状态。 */
     public List<CandidatePaperQuestionResponse> candidateQuestions(Long paperId) {
         getRequired(paperId);
         return paperQuestionMapper.findByPaperId(paperId).stream()
@@ -192,6 +213,7 @@ public class ExamPaperService {
     }
 
     @Transactional
+    /** 删除、移除或清理，同时维护关联数据和权限不变量。 */
     public void delete(Long paperId, Long requesterId, boolean requesterAdmin) {
         ExamPaper paper = getRequired(paperId);
         assertOwnerOrAdmin(paper, requesterId, requesterAdmin);
@@ -201,11 +223,13 @@ public class ExamPaperService {
         }
     }
 
+    /** 返回Required。 */
     public ExamPaper getRequired(Long paperId) {
         return paperMapper.findById(paperId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "试卷不存在"));
     }
 
+    /** 返回ReadyOwned。 */
     public ExamPaper getReadyOwned(Long paperId, Long requesterId, boolean requesterAdmin) {
         ExamPaper paper = getRequired(paperId);
         assertOwnerOrAdmin(paper, requesterId, requesterAdmin);
@@ -217,12 +241,14 @@ public class ExamPaperService {
         return paper;
     }
 
+    /** 校验OwnerOr管理及相关业务前置条件，不满足时抛出明确业务异常。 */
     public void assertOwnerOrAdmin(ExamPaper paper, Long requesterId, boolean requesterAdmin) {
         if (!requesterAdmin && !paper.getCreatorId().equals(requesterId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权管理其他发布者的试卷");
         }
     }
 
+    /** 校验Mutable及相关业务前置条件，不满足时抛出明确业务异常。 */
     private void assertMutable(ExamPaper paper) {
         if (paper.getStatus() == ExamPaperStatus.ARCHIVED) {
             throw invalidState("已归档试卷不能修改");
@@ -232,6 +258,7 @@ public class ExamPaperService {
         }
     }
 
+    /** 校验题目订单及相关业务前置条件，不满足时抛出明确业务异常。 */
     private void validateQuestionOrder(List<PaperQuestionWriteRequest> questions) {
         Set<Long> questionIds = new HashSet<>();
         Set<Integer> sortOrders = new HashSet<>();
@@ -250,6 +277,7 @@ public class ExamPaperService {
         }
     }
 
+    /** 执行 managementQuestion 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private PaperQuestionManagementResponse managementQuestion(ExamPaperQuestion question) {
         return new PaperQuestionManagementResponse(
                 question.getId(),
@@ -264,6 +292,7 @@ public class ExamPaperService {
         );
     }
 
+    /** 查询Options相关数据；只返回当前调用方有权查看的结果。 */
     private List<QuestionOptionResponse> readOptions(String json) {
         if (json == null || json.isBlank()) {
             return List.of();
@@ -275,6 +304,7 @@ public class ExamPaperService {
         }
     }
 
+    /** 查询答案相关数据；只返回当前调用方有权查看的结果。 */
     private QuestionAnswer readAnswer(String json) {
         try {
             com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(json);
@@ -288,6 +318,7 @@ public class ExamPaperService {
         }
     }
 
+    /** 执行 writeJson 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private String writeJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -296,10 +327,12 @@ public class ExamPaperService {
         }
     }
 
+    /** 转换或规范化数据，不引入额外持久化副作用。 */
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    /** 执行 invalidState 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private BusinessException invalidState(String message) {
         return new BusinessException(ErrorCode.CONFLICT, message);
     }

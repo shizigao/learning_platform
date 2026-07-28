@@ -1,3 +1,7 @@
+/* 文件职责：定义考试答案的 MyBatis 查询和写入操作，是业务服务访问数据库的持久化端口。
+ * 所属模块：试卷、考试、作答、阅卷、统计与错题；所在分层：MyBatis 持久化层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.exam.mapper;
 
 import com.learningplatform.exam.domain.ExamAnswer;
@@ -11,7 +15,13 @@ import java.util.List;
 import java.util.Optional;
 
 @Mapper
+/**
+ * 定义考试答案的 MyBatis 查询和写入操作，是业务服务访问数据库的持久化端口。
+ *
+ * <p>职责边界：只表达数据库读写语义，不在 SQL 映射层做权限和业务决策。</p>
+ */
 public interface ExamAnswerMapper {
+    /** 复用学习资料查询列，保证不同查询返回一致字段集合。 */
     String COLUMNS = """
             ea.id, ea.attempt_id, ea.paper_question_id, ea.question_id,
             ea.answer_json, ea.answer_text, ea.max_score, ea.score,
@@ -33,6 +43,7 @@ public interface ExamAnswerMapper {
                 'UNANSWERED', #{savedAt}
             )
             """)
+    /** 插入新记录，并返回受影响行数；配置生成主键时同时回填实体 ID。 */
     int insertIfAbsent(ExamAnswer answer);
 
     @Select("""
@@ -44,6 +55,7 @@ public interface ExamAnswerMapper {
             WHERE ea.attempt_id = #{attemptId}
             ORDER BY epq.sort_order ASC, ea.id ASC
             """)
+    /** 执行 findByAttemptId 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     List<ExamAnswer> findByAttemptId(Long attemptId);
 
     @Select("""
@@ -58,6 +70,7 @@ public interface ExamAnswerMapper {
               AND r.grading_completed = TRUE
             ORDER BY epq.sort_order ASC, ea.id ASC
             """)
+    /** 执行 findGradedByExamId 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     List<ExamAnswer> findGradedByExamId(Long examId);
 
     @Select("""
@@ -68,6 +81,7 @@ public interface ExamAnswerMapper {
             JOIN question q ON q.id = ea.question_id
             WHERE ea.attempt_id = #{attemptId} AND ea.question_id = #{questionId}
             """)
+    /** 执行 findOne 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<ExamAnswer> findOne(
             @Param("attemptId") Long attemptId,
             @Param("questionId") Long questionId
@@ -81,6 +95,7 @@ public interface ExamAnswerMapper {
             JOIN question q ON q.id = ea.question_id
             WHERE ea.id = #{answerId} AND ea.attempt_id = #{attemptId}
             """)
+    /** 执行 findByIdAndAttempt 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<ExamAnswer> findByIdAndAttempt(
             @Param("answerId") Long answerId,
             @Param("attemptId") Long attemptId
@@ -96,6 +111,7 @@ public interface ExamAnswerMapper {
                 saved_at = #{savedAt}
             WHERE id = #{id}
             """)
+    /** 执行 updateAnswer 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int updateAnswer(ExamAnswer answer);
 
     @Update("""
@@ -108,6 +124,7 @@ public interface ExamAnswerMapper {
                 graded_at = #{gradedAt}
             WHERE id = #{id}
             """)
+    /** 执行 updateAutomaticGrade 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int updateAutomaticGrade(ExamAnswer answer);
 
     @Update("""
@@ -121,6 +138,7 @@ public interface ExamAnswerMapper {
             WHERE id = #{id} AND attempt_id = #{attemptId}
               AND grading_status IN ('PENDING_REVIEW', 'GRADED')
             """)
+    /** 执行 updateManualGrade 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int updateManualGrade(ExamAnswer answer);
 
     @Select("""
@@ -128,6 +146,7 @@ public interface ExamAnswerMapper {
             FROM exam_answer
             WHERE attempt_id = #{attemptId}
             """)
+    /** 执行 countTotal 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     int countTotal(Long attemptId);
 
     @Select("""
@@ -136,6 +155,7 @@ public interface ExamAnswerMapper {
             WHERE attempt_id = #{attemptId}
               AND grading_status <> 'UNANSWERED'
             """)
+    /** 执行 countAnswered 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     int countAnswered(Long attemptId);
 
     @Select("""
@@ -144,5 +164,6 @@ public interface ExamAnswerMapper {
             WHERE attempt_id = #{attemptId}
               AND grading_status = 'PENDING_REVIEW'
             """)
+    /** 执行 countPendingReview 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     int countPendingReview(Long attemptId);
 }

@@ -1,3 +1,7 @@
+/* 文件职责：定义或实现模拟AI 客户端外部调用适配，隔离供应商协议与业务服务。
+ * 所属模块：AI 任务、对话、分析与供应商调用；所在分层：外部服务适配层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.ai.client;
 
 import java.time.Duration;
@@ -6,16 +10,27 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * 定义或实现模拟AI 客户端外部调用适配，隔离供应商协议与业务服务。
+ *
+ * <p>职责边界：负责协议转换、超时和安全日志，不直接扣减业务权益。</p>
+ */
 public class MockAiClient implements AiClient {
+    /** 定义 PROVIDER 常量，统一该组件使用的固定规则或默认值。 */
     private static final String PROVIDER = "mock";
+    /** 保存model，供该类型的业务逻辑读取或更新。 */
     private final String model;
+    /** 保存scenario，供该类型的业务逻辑读取或更新。 */
     private final Scenario scenario;
+    /** 保存delay，供该类型的业务逻辑读取或更新。 */
     private final Duration delay;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public MockAiClient(String model) {
         this(model, "success", Duration.ZERO);
     }
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public MockAiClient(String model, String scenario, Duration delay) {
         this.model = requireText(model, "模拟 AI 模型不能为空");
         this.scenario = parseScenario(scenario);
@@ -29,16 +44,19 @@ public class MockAiClient implements AiClient {
     }
 
     @Override
+    /** 执行 provider 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     public String provider() {
         return PROVIDER;
     }
 
     @Override
+    /** 执行 model 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     public String model() {
         return model;
     }
 
     @Override
+    /** 执行完成状态流转，仅允许从合法前置状态进入目标状态。 */
     public AiClientResponse complete(AiClientRequest request) {
         waitForDelay();
         if (scenario == Scenario.FAILURE) {
@@ -112,6 +130,7 @@ public class MockAiClient implements AiClient {
         );
     }
 
+    /** 执行 waitForDelay 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private void waitForDelay() {
         if (delay.isZero()) {
             return;
@@ -128,6 +147,7 @@ public class MockAiClient implements AiClient {
         }
     }
 
+    /** 转换或规范化Scenario数据，不引入额外持久化副作用。 */
     private Scenario parseScenario(String value) {
         String normalized = value == null
                 ? "success"
@@ -143,6 +163,7 @@ public class MockAiClient implements AiClient {
         };
     }
 
+    /** 执行 jsonEscape 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private String jsonEscape(String value) {
         return value
                 .replace("\\", "\\\\")
@@ -152,6 +173,7 @@ public class MockAiClient implements AiClient {
                 .replace("\t", "\\t");
     }
 
+    /** 校验Text及相关业务前置条件，不满足时抛出明确业务异常。 */
     private String requireText(String value, String message) {
         if (value == null || value.isBlank()) {
             throw new AiClientException(AiClientException.Kind.CONFIGURATION, message);

@@ -1,3 +1,7 @@
+/* 文件职责：实现管理用户业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：平台治理与管理员操作；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.admin.service;
 
 import com.learningplatform.admin.dto.AdminUserListQuery;
@@ -18,11 +22,20 @@ import java.util.List;
 import java.util.Set;
 
 @Service
+/**
+ * 实现管理用户业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ *
+ * <p>职责边界：业务状态变化在此集中完成；跨表写入需保持事务一致性。</p>
+ */
 public class AdminUserService {
+    /** 访问用户持久化数据。 */
     private final UserMapper userMapper;
+    /** 委托用户执行对应领域规则。 */
     private final UserService userService;
+    /** 委托角色执行对应领域规则。 */
     private final RoleService roleService;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public AdminUserService(
             UserMapper userMapper,
             UserService userService,
@@ -33,6 +46,7 @@ public class AdminUserService {
         this.roleService = roleService;
     }
 
+    /** 查询目标相关数据；只返回当前调用方有权查看的结果。 */
     public PageResult<AdminUserResponse> list(AdminUserListQuery query) {
         String keyword = normalize(query.getKeyword());
         long total = userMapper.countForAdmin(
@@ -52,11 +66,13 @@ public class AdminUserService {
         return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
     }
 
+    /** 查询目标相关数据；只返回当前调用方有权查看的结果。 */
     public AdminUserResponse detail(Long userId) {
         return response(userService.getRequiredById(userId));
     }
 
     @Transactional
+    /** 更新状态，通过返回值或版本条件识别并发状态变化。 */
     public AdminUserResponse updateStatus(
             Long operatorId,
             Long userId,
@@ -83,6 +99,7 @@ public class AdminUserService {
     }
 
     @Transactional
+    /** 更新Roles，通过返回值或版本条件识别并发状态变化。 */
     public AdminUserResponse replaceRoles(
             Long operatorId,
             Long userId,
@@ -112,6 +129,7 @@ public class AdminUserService {
         return detail(userId);
     }
 
+    /** 执行 lockUser 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private void lockUser(Long userId) {
         userMapper.lockById(userId)
                 .orElseThrow(() -> new BusinessException(
@@ -120,6 +138,7 @@ public class AdminUserService {
                 ));
     }
 
+    /** 执行 response 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private AdminUserResponse response(User user) {
         return AdminUserResponse.from(
                 user,
@@ -127,6 +146,7 @@ public class AdminUserService {
         );
     }
 
+    /** 转换或规范化数据，不引入额外持久化副作用。 */
     private String normalize(String keyword) {
         return keyword == null || keyword.isBlank() ? null : keyword.trim();
     }

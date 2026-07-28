@@ -1,3 +1,7 @@
+/* 文件职责：提供发布者题目相关 HTTP 接口，负责请求校验、身份解析、权限入口和统一响应封装。
+ * 所属模块：题库、题目、选项与标准答案；所在分层：HTTP 接口层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.question.web;
 
 import com.learningplatform.auth.security.AuthenticatedUserPrincipal;
@@ -30,10 +34,18 @@ import java.util.List;
 @Validated
 @RestController
 @RequestMapping("/api/publisher")
+/**
+ * 提供发布者题目相关 HTTP 接口，负责请求校验、身份解析、权限入口和统一响应封装。
+ *
+ * <p>职责边界：只处理 HTTP 协议和身份入口，不直接编写 SQL 或复制领域规则。</p>
+ */
 public class PublisherQuestionController {
+    /** 委托题库执行对应领域规则。 */
     private final QuestionBankService bankService;
+    /** 委托题目执行对应领域规则。 */
     private final QuestionService questionService;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public PublisherQuestionController(
             QuestionBankService bankService,
             QuestionService questionService
@@ -43,11 +55,13 @@ public class PublisherQuestionController {
     }
 
     @GetMapping("/question-banks")
+    /** 处理 GET /question-banks 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<List<QuestionBankResponse>> listBanks(Authentication authentication) {
         return ApiResponse.success(bankService.list(principal(authentication).userId()));
     }
 
     @PostMapping("/question-banks")
+    /** 处理 POST /question-banks 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<QuestionBankResponse> createBank(
             Authentication authentication,
             @Valid @RequestBody QuestionBankWriteRequest request
@@ -56,6 +70,7 @@ public class PublisherQuestionController {
     }
 
     @PutMapping("/question-banks/{bankId}")
+    /** 处理 PUT /question-banks/{bankId} 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<QuestionBankResponse> updateBank(
             Authentication authentication,
             @PathVariable Long bankId,
@@ -71,6 +86,7 @@ public class PublisherQuestionController {
     }
 
     @DeleteMapping("/question-banks/{bankId}")
+    /** 处理 DELETE /question-banks/{bankId} 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<Void> deleteBank(
             Authentication authentication,
             @PathVariable Long bankId
@@ -81,6 +97,7 @@ public class PublisherQuestionController {
     }
 
     @GetMapping("/questions")
+    /** 处理 GET /questions 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<PageResult<QuestionManagementResponse>> listQuestions(
             Authentication authentication,
             @Valid @ModelAttribute QuestionListQuery query
@@ -89,6 +106,7 @@ public class PublisherQuestionController {
     }
 
     @PostMapping("/questions")
+    /** 处理 POST /questions 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<QuestionManagementResponse> createQuestion(
             Authentication authentication,
             @Valid @RequestBody QuestionWriteRequest request
@@ -102,6 +120,7 @@ public class PublisherQuestionController {
     }
 
     @GetMapping("/questions/{questionId}")
+    /** 处理 GET /questions/{questionId} 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<QuestionManagementResponse> questionDetail(
             Authentication authentication,
             @PathVariable Long questionId
@@ -115,6 +134,7 @@ public class PublisherQuestionController {
     }
 
     @PutMapping("/questions/{questionId}")
+    /** 处理 PUT /questions/{questionId} 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<QuestionManagementResponse> updateQuestion(
             Authentication authentication,
             @PathVariable Long questionId,
@@ -130,6 +150,7 @@ public class PublisherQuestionController {
     }
 
     @DeleteMapping("/questions/{questionId}")
+    /** 处理 DELETE /questions/{questionId} 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<Void> deleteQuestion(
             Authentication authentication,
             @PathVariable Long questionId
@@ -139,10 +160,12 @@ public class PublisherQuestionController {
         return ApiResponse.success();
     }
 
+    /** 处理 DELETE /questions/{questionId} 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     private AuthenticatedUserPrincipal principal(Authentication authentication) {
         return AuthenticationPrincipalResolver.require(authentication);
     }
 
+    /** 判断是否满足管理条件，不修改持久化状态。 */
     private boolean isAdmin(AuthenticatedUserPrincipal principal) {
         return principal.roles().contains(RoleCode.ADMIN);
     }

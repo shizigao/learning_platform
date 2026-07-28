@@ -1,3 +1,7 @@
+/* 文件职责：实现学习资料业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：学习资料、分类、文件、审核与访问控制；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.content.service;
 
 import com.learningplatform.common.api.ErrorCode;
@@ -36,20 +40,35 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
+/**
+ * 实现学习资料业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ *
+ * <p>职责边界：业务状态变化在此集中完成；跨表写入需保持事务一致性。</p>
+ */
 public class LearningContentService {
     private static final Logger log = LoggerFactory.getLogger(LearningContentService.class);
     private static final BigDecimal MINIMUM_PAID_PRICE = new BigDecimal("0.01");
 
+    /** 访问学习资料持久化数据。 */
     private final LearningContentMapper contentMapper;
+    /** 访问文件持久化数据。 */
     private final ContentFileMapper fileMapper;
+    /** 委托分类执行对应领域规则。 */
     private final ContentCategoryService categoryService;
+    /** 委托访问权执行对应领域规则。 */
     private final ContentAccessService accessService;
+    /** 委托存储执行对应领域规则。 */
     private final MinioStorageService storageService;
+    /** 访问班级范围持久化数据。 */
     private final ClassScopeMapper classScopeMapper;
+    /** 委托班级执行对应领域规则。 */
     private final ClassroomService classroomService;
+    /** 委托用户执行对应领域规则。 */
     private final UserService userService;
+    /** 委托头像执行对应领域规则。 */
     private final UserAvatarService avatarService;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public LearningContentService(
             LearningContentMapper contentMapper,
             ContentFileMapper fileMapper,
@@ -73,6 +92,7 @@ public class LearningContentService {
     }
 
     @Transactional
+    /** 创建或初始化，并维护唯一性、初始状态和必要关联。 */
     public ContentDetailResponse create(Long publisherId, ContentWriteRequest request) {
         categoryService.getRequiredEnabled(request.categoryId());
         LearningContent content = new LearningContent();
@@ -87,6 +107,7 @@ public class LearningContentService {
     }
 
     @Transactional
+    /** 更新，通过返回值或版本条件识别并发状态变化。 */
     public ContentDetailResponse update(
             Long contentId,
             Long requesterUserId,
@@ -97,6 +118,7 @@ public class LearningContentService {
         LearningContent content = getRequired(contentId);
         assertOwnerOrAdmin(content, requesterUserId, requesterAdmin);
         assertEditable(content);
+        //点击applyWriteRequest
         applyWriteRequest(content, request);
         if (content.getStatus() == ContentStatus.REJECTED) {
             content.setStatus(ContentStatus.DRAFT);
@@ -108,6 +130,7 @@ public class LearningContentService {
         return publisherDetail(contentId, requesterUserId, requesterAdmin);
     }
 
+    /** 查询发布相关数据；只返回当前调用方有权查看的结果。 */
     public PageResult<ContentSummaryResponse> listPublished(ContentListQuery query) {
         String keyword = normalize(query.getKeyword());
         long total = contentMapper.countPublished(
@@ -130,6 +153,7 @@ public class LearningContentService {
     }
 
     @Transactional
+    /** 执行发布状态流转，仅允许从合法前置状态进入目标状态。 */
     public ContentDetailResponse publishedDetail(
             Long contentId,
             Long requesterUserId,
@@ -148,10 +172,12 @@ public class LearningContentService {
         return detail(content, hasAccess, hasAccess);
     }
 
+    /** 执行发布状态流转，仅允许从合法前置状态进入目标状态。 */
     public ContentDetailResponse publishedDetail(Long contentId) {
         return publishedDetail(contentId, null, false);
     }
 
+    /** 按发布者查询数据；只返回当前调用方有权查看的结果。 */
     public PageResult<ContentSummaryResponse> listByPublisher(
             Long publisherId,
             PublisherContentListQuery query
@@ -170,6 +196,7 @@ public class LearningContentService {
         return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
     }
 
+    /** 查询Public按发布者相关数据；只返回当前调用方有权查看的结果。 */
     public PageResult<ContentSummaryResponse> listPublicByPublisher(
             Long publisherId,
             PageQuery query
@@ -185,10 +212,12 @@ public class LearningContentService {
         return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
     }
 
+    /** 执行 publicationStats 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public ContentPublicationStats publicationStats(Long publisherId) {
         return contentMapper.publicationStats(publisherId);
     }
 
+    /** 查询For班级相关数据；只返回当前调用方有权查看的结果。 */
     public PageResult<ContentSummaryResponse> listForClass(
             Long classId,
             Long requesterId,
@@ -206,6 +235,7 @@ public class LearningContentService {
         return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
     }
 
+    /** 查询ReferenceCandidates相关数据；只返回当前调用方有权查看的结果。 */
     public PageResult<ContentSummaryResponse> listReferenceCandidates(
             ContentReferenceSearchQuery query
     ) {
@@ -228,6 +258,7 @@ public class LearningContentService {
         return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
     }
 
+    /** 查询For管理相关数据；只返回当前调用方有权查看的结果。 */
     public PageResult<ContentSummaryResponse> listForAdmin(AdminContentListQuery query) {
         String keyword = normalize(query.getKeyword());
         long total = contentMapper.countForAdmin(query.getStatus(), keyword);
@@ -242,6 +273,7 @@ public class LearningContentService {
         return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
     }
 
+    /** 执行发布状态流转，仅允许从合法前置状态进入目标状态。 */
     public ContentDetailResponse publisherDetail(
             Long contentId,
             Long requesterUserId,
@@ -253,6 +285,7 @@ public class LearningContentService {
     }
 
     @Transactional
+    /** 执行提交状态流转，仅允许从合法前置状态进入目标状态。 */
     public ContentDetailResponse submit(Long contentId, Long publisherId) {
         LearningContent content = getRequired(contentId);
         assertOwnerOrAdmin(content, publisherId, false);
@@ -265,6 +298,7 @@ public class LearningContentService {
     }
 
     @Transactional
+    /** 执行审核通过状态流转，仅允许从合法前置状态进入目标状态。 */
     public ContentDetailResponse approve(Long contentId) {
         LearningContent content = getRequired(contentId);
         if (content.getStatus() != ContentStatus.PENDING_REVIEW
@@ -275,6 +309,7 @@ public class LearningContentService {
     }
 
     @Transactional
+    /** 执行驳回状态流转，仅允许从合法前置状态进入目标状态。 */
     public ContentDetailResponse reject(Long contentId, String reason) {
         LearningContent content = getRequired(contentId);
         if (content.getStatus() != ContentStatus.PENDING_REVIEW
@@ -285,6 +320,7 @@ public class LearningContentService {
     }
 
     @Transactional
+    /** 执行 takeOffline 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public ContentDetailResponse takeOffline(Long contentId) {
         LearningContent content = getRequired(contentId);
         if (content.getStatus() != ContentStatus.PUBLISHED
@@ -295,6 +331,7 @@ public class LearningContentService {
     }
 
     @Transactional
+    /** 执行 republish 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public ContentDetailResponse republish(Long contentId) {
         LearningContent content = getRequired(contentId);
         if (content.getStatus() != ContentStatus.OFFLINE
@@ -305,6 +342,7 @@ public class LearningContentService {
     }
 
     @Transactional
+    /** 删除、移除或清理，同时维护关联数据和权限不变量。 */
     public void delete(Long contentId, Long requesterUserId, boolean requesterAdmin) {
         LearningContent content = getRequired(contentId);
         assertOwnerOrAdmin(content, requesterUserId, requesterAdmin);
@@ -314,11 +352,13 @@ public class LearningContentService {
         }
     }
 
+    /** 返回Required。 */
     public LearningContent getRequired(Long contentId) {
         return contentMapper.findById(contentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "学习资料不存在"));
     }
 
+    /** 校验OwnerOr管理及相关业务前置条件，不满足时抛出明确业务异常。 */
     public void assertOwnerOrAdmin(
             LearningContent content,
             Long requesterUserId,
@@ -329,6 +369,7 @@ public class LearningContentService {
         }
     }
 
+    /** 校验可编辑及相关业务前置条件，不满足时抛出明确业务异常。 */
     public void assertEditable(LearningContent content) {
         if (content.getStatus() != ContentStatus.DRAFT
                 && content.getStatus() != ContentStatus.REJECTED) {
@@ -336,11 +377,13 @@ public class LearningContentService {
         }
     }
 
+    /** 执行 applyWriteRequest 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private void applyWriteRequest(LearningContent content, ContentWriteRequest request) {
         content.setCategoryId(request.categoryId());
         content.setTitle(request.title().trim());
         content.setSummary(normalize(request.summary()));
         content.setContentType(ContentType.GENERAL);
+        //
         content.setArticleBody(normalize(request.articleBody()));
         ContentDistributionMode mode = request.distributionMode() == null
                 ? ContentDistributionMode.PUBLIC
@@ -355,6 +398,7 @@ public class LearningContentService {
         }
     }
 
+    /** 更新班级Scopes，通过返回值或版本条件识别并发状态变化。 */
     private void replaceClassScopes(
             Long contentId,
             Long publisherId,
@@ -373,6 +417,7 @@ public class LearningContentService {
         });
     }
 
+    /** 转换或规范化价格数据，不引入额外持久化副作用。 */
     private BigDecimal normalizePrice(Boolean free, BigDecimal requestedPrice) {
         if (Boolean.TRUE.equals(free)) {
             return BigDecimal.ZERO.setScale(2);
@@ -383,6 +428,7 @@ public class LearningContentService {
         return requestedPrice;
     }
 
+    /** 校验ReadyFor复习及相关业务前置条件，不满足时抛出明确业务异常。 */
     private void validateReadyForReview(LearningContent content) {
         boolean hasBody = content.getArticleBody() != null && !content.getArticleBody().isBlank();
         int relevantFiles = fileMapper.countByContentId(content.getId())
@@ -394,6 +440,7 @@ public class LearningContentService {
         }
     }
 
+    /** 查询目标相关数据；只返回当前调用方有权查看的结果。 */
     private ContentDetailResponse detail(
             LearningContent content,
             boolean includeProtectedBody,
@@ -415,10 +462,12 @@ public class LearningContentService {
         );
     }
 
+    /** 执行 summary 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public ContentSummaryResponse summary(LearningContent content) {
         return ContentSummaryResponse.from(content, coverUrl(content));
     }
 
+    /** 执行 coverUrl 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private String coverUrl(LearningContent content) {
         if (content.getCoverFileId() == null) {
             return null;
@@ -440,14 +489,17 @@ public class LearningContentService {
                 .orElse(null);
     }
 
+    /** 执行 valueOrZero 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private long valueOrZero(Long value) {
         return value == null ? 0 : value;
     }
 
+    /** 转换或规范化数据，不引入额外持久化副作用。 */
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    /** 执行 invalidState 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private BusinessException invalidState(String message) {
         return new BusinessException(ErrorCode.CONFLICT, message);
     }

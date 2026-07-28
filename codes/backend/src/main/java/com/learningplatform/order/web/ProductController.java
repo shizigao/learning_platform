@@ -1,3 +1,7 @@
+/* 文件职责：提供商品相关 HTTP 接口，负责请求校验、身份解析、权限入口和统一响应封装。
+ * 所属模块：商品、订单、支付模拟与用户权益；所在分层：HTTP 接口层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.order.web;
 
 import com.learningplatform.common.api.ApiResponse;
@@ -14,14 +18,22 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/products")
+/**
+ * 提供商品相关 HTTP 接口，负责请求校验、身份解析、权限入口和统一响应封装。
+ *
+ * <p>职责边界：只处理 HTTP 协议和身份入口，不直接编写 SQL 或复制领域规则。</p>
+ */
 public class ProductController {
+    /** 委托商品执行对应领域规则。 */
     private final ProductService productService;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public ProductController(ProductService productService) {
         this.productService = productService;
     }
 
     @GetMapping
+    /** 处理 GET 当前资源 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<List<ProductResponse>> list(
             @RequestParam(required = false) ProductType productType
     ) {
@@ -29,6 +41,7 @@ public class ProductController {
     }
 
     @GetMapping("/{productId}")
+    /** 处理 GET /{productId} 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<ProductResponse> detail(@PathVariable Long productId) {
         return ApiResponse.success(ProductResponse.from(
                 productService.getPurchasable(productId)

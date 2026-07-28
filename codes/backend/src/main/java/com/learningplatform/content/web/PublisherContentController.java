@@ -1,3 +1,7 @@
+/* 文件职责：提供发布者学习资料相关 HTTP 接口，负责请求校验、身份解析、权限入口和统一响应封装。
+ * 所属模块：学习资料、分类、文件、审核与访问控制；所在分层：HTTP 接口层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.content.web;
 
 import com.learningplatform.auth.security.AuthenticatedUserPrincipal;
@@ -35,10 +39,18 @@ import org.springframework.web.multipart.MultipartFile;
 @Validated
 @RestController
 @RequestMapping("/api/publisher/contents")
+/**
+ * 提供发布者学习资料相关 HTTP 接口，负责请求校验、身份解析、权限入口和统一响应封装。
+ *
+ * <p>职责边界：只处理 HTTP 协议和身份入口，不直接编写 SQL 或复制领域规则。</p>
+ */
 public class PublisherContentController {
+    /** 委托学习资料执行对应领域规则。 */
     private final LearningContentService contentService;
+    /** 委托文件执行对应领域规则。 */
     private final ContentFileService fileService;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public PublisherContentController(
             LearningContentService contentService,
             ContentFileService fileService
@@ -48,6 +60,7 @@ public class PublisherContentController {
     }
 
     @GetMapping
+    /** 处理 GET 当前资源 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<PageResult<ContentSummaryResponse>> list(
             Authentication authentication,
             @Valid @ModelAttribute PublisherContentListQuery query
@@ -57,6 +70,7 @@ public class PublisherContentController {
     }
 
     @GetMapping("/reference-candidates")
+    /** 处理 GET /reference-candidates 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<PageResult<ContentSummaryResponse>> referenceCandidates(
             @Valid @ModelAttribute ContentReferenceSearchQuery query
     ) {
@@ -64,6 +78,7 @@ public class PublisherContentController {
     }
 
     @PostMapping
+    /** 处理 POST 当前资源 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<ContentDetailResponse> create(
             Authentication authentication,
             @Valid @RequestBody ContentWriteRequest request
@@ -72,6 +87,7 @@ public class PublisherContentController {
     }
 
     @GetMapping("/{contentId}")
+    /** 处理 GET /{contentId} 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<ContentDetailResponse> detail(
             Authentication authentication,
             @PathVariable Long contentId
@@ -85,12 +101,14 @@ public class PublisherContentController {
     }
 
     @PutMapping("/{contentId}")
+    /** 处理 PUT /{contentId} 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<ContentDetailResponse> update(
             Authentication authentication,
             @PathVariable Long contentId,
             @Valid @RequestBody ContentWriteRequest request
     ) {
         AuthenticatedUserPrincipal principal = principal(authentication);
+        // 点击update
         return ApiResponse.success(contentService.update(
                 contentId,
                 principal.userId(),
@@ -100,6 +118,7 @@ public class PublisherContentController {
     }
 
     @DeleteMapping("/{contentId}")
+    /** 处理 DELETE /{contentId} 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<Void> delete(
             Authentication authentication,
             @PathVariable Long contentId
@@ -110,6 +129,7 @@ public class PublisherContentController {
     }
 
     @PostMapping("/{contentId}/submit")
+    /** 处理 POST /{contentId}/submit 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<ContentDetailResponse> submit(
             Authentication authentication,
             @PathVariable Long contentId
@@ -119,6 +139,7 @@ public class PublisherContentController {
     }
 
     @PostMapping("/{contentId}/files")
+    /** 处理 POST /{contentId}/files 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<ContentFileResponse> uploadFile(
             Authentication authentication,
             @PathVariable Long contentId,
@@ -128,6 +149,7 @@ public class PublisherContentController {
             @RequestParam(required = false) @Min(value = 0, message = "视频时长不能小于0") Integer durationSeconds
     ) {
         AuthenticatedUserPrincipal principal = principal(authentication);
+        // 点击upload
         return ApiResponse.success(fileService.upload(
                 contentId,
                 fileRole,
@@ -140,6 +162,7 @@ public class PublisherContentController {
     }
 
     @DeleteMapping("/{contentId}/files/{fileId}")
+    /** 处理 DELETE /{contentId}/files/{fileId} 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<Void> deleteFile(
             Authentication authentication,
             @PathVariable Long contentId,
@@ -151,6 +174,7 @@ public class PublisherContentController {
     }
 
     @GetMapping("/{contentId}/files/{fileId}/preview-url")
+    /** 处理 GET /{contentId}/files/{fileId}/preview-url 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<FileUrlResponse> previewUrl(
             Authentication authentication,
             @PathVariable Long contentId,
@@ -166,12 +190,14 @@ public class PublisherContentController {
     }
 
     @GetMapping("/{contentId}/files/{fileId}/download-url")
+    /** 处理 GET /{contentId}/files/{fileId}/download-url 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<FileUrlResponse> downloadUrl(
             Authentication authentication,
             @PathVariable Long contentId,
             @PathVariable Long fileId
     ) {
         AuthenticatedUserPrincipal principal = principal(authentication);
+        // 点击downloadUrl
         return ApiResponse.success(new FileUrlResponse(fileService.downloadUrl(
                 contentId,
                 fileId,
@@ -180,10 +206,12 @@ public class PublisherContentController {
         )));
     }
 
+    /** 执行 principal 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private AuthenticatedUserPrincipal principal(Authentication authentication) {
         return AuthenticationPrincipalResolver.require(authentication);
     }
 
+    /** 判断是否满足管理条件，不修改持久化状态。 */
     private boolean isAdmin(AuthenticatedUserPrincipal principal) {
         return principal.roles().contains(RoleCode.ADMIN);
     }

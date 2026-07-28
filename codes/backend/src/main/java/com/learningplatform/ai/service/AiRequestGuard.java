@@ -1,3 +1,7 @@
+/* 文件职责：保护AI请求保护调用的频率、并发和超时边界，并把底层失败转换为安全错误。
+ * 所属模块：AI 任务、对话、分析与供应商调用；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.ai.service;
 
 import com.learningplatform.common.api.ErrorCode;
@@ -25,15 +29,26 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 @Service
+/**
+ * 保护AI请求保护调用的频率、并发和超时边界，并把底层失败转换为安全错误。
+ *
+ * <p>职责边界：业务状态变化在此集中完成；跨表写入需保持事务一致性。</p>
+ */
 public class AiRequestGuard {
+    /** 保存requests每个窗口，供该类型的业务逻辑读取或更新。 */
     private final int requestsPerWindow;
+    /** 保存频率窗口，供该类型的业务逻辑读取或更新。 */
     private final Duration rateWindow;
+    /** 保存最大Concurrent每个用户，供该类型的业务逻辑读取或更新。 */
     private final int maxConcurrentPerUser;
+    /** 保存超时，供该类型的业务逻辑读取或更新。 */
     private final Duration timeout;
     private final Map<Long, Deque<Instant>> requestWindows = new ConcurrentHashMap<>();
     private final Map<Long, Semaphore> userSemaphores = new ConcurrentHashMap<>();
+    /** 保存executor，供该类型的业务逻辑读取或更新。 */
     private final ExecutorService executor;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public AiRequestGuard(AiProperties properties) {
         AiProperties.Limits limits = requireLimits(properties);
         this.requestsPerWindow = positive(
@@ -58,6 +73,7 @@ public class AiRequestGuard {
         this.executor = Executors.newCachedThreadPool(factory);
     }
 
+    /** 执行 execute 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public <T> T execute(Long userId, Supplier<T> operation) {
         recordRequest(userId);
         Semaphore semaphore = userSemaphores.computeIfAbsent(
@@ -122,6 +138,7 @@ public class AiRequestGuard {
         }
     }
 
+    /** 执行 recordRequest 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private void recordRequest(Long userId) {
         Instant now = Instant.now();
         Instant earliest = now.minus(rateWindow);
@@ -149,6 +166,7 @@ public class AiRequestGuard {
         executor.shutdownNow();
     }
 
+    /** 校验Limits及相关业务前置条件，不满足时抛出明确业务异常。 */
     private AiProperties.Limits requireLimits(AiProperties properties) {
         if (properties == null || properties.limits() == null) {
             throw new IllegalStateException("缺少 AI 限制配置");
@@ -156,6 +174,7 @@ public class AiRequestGuard {
         return properties.limits();
     }
 
+    /** 执行 positive 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private int positive(int value, String message) {
         if (value <= 0) {
             throw new IllegalStateException(message);
@@ -163,6 +182,7 @@ public class AiRequestGuard {
         return value;
     }
 
+    /** 执行 positive 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private Duration positive(Duration value, String message) {
         if (value == null || value.isZero() || value.isNegative()) {
             throw new IllegalStateException(message);
@@ -178,8 +198,10 @@ public class AiRequestGuard {
     }
 
     public static final class GuardException extends BusinessException {
+        /** 保存failure，供该类型的业务逻辑读取或更新。 */
         private final GuardFailure failure;
 
+        /** 执行 GuardException 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
         public GuardException(
                 GuardFailure failure,
                 ErrorCode errorCode,
@@ -189,6 +211,7 @@ public class AiRequestGuard {
             this.failure = failure;
         }
 
+        /** 返回Failure。 */
         public GuardFailure getFailure() {
             return failure;
         }

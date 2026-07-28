@@ -1,3 +1,7 @@
+/* 文件职责：实现考生考试Session业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：试卷、考试、作答、阅卷、统计与错题；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.exam.service;
 
 import com.learningplatform.common.api.ErrorCode;
@@ -31,13 +35,20 @@ import java.time.temporal.ChronoUnit;
  */
 @Service
 public class CandidateExamSessionService {
+    /** 委托考试执行对应领域规则。 */
     private final ExamService examService;
+    /** 委托试卷执行对应领域规则。 */
     private final ExamPaperService paperService;
+    /** 访问考生持久化数据。 */
     private final ExamCandidateMapper candidateMapper;
+    /** 访问作答持久化数据。 */
     private final ExamAttemptMapper attemptMapper;
+    /** 委托答案执行对应领域规则。 */
     private final ExamAnswerService answerService;
+    /** 委托运行态State执行对应领域规则。 */
     private final ExamRuntimeStateService runtimeStateService;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public CandidateExamSessionService(
             ExamService examService,
             ExamPaperService paperService,
@@ -54,7 +65,7 @@ public class CandidateExamSessionService {
         this.runtimeStateService = runtimeStateService;
     }
 
-    /** 返回考试说明、试卷摘要和当前用户是否可开始/继续的原因。 */
+    /** 查询目标相关数据；只返回当前调用方有权查看的结果。 */
     public CandidateExamOverviewResponse overview(Long examId, Long userId) {
         LocalDateTime now = now();
         Exam exam = examService.getRequired(examId);
@@ -137,6 +148,7 @@ public class CandidateExamSessionService {
         return startResponse(exam, attempt, now);
     }
 
+    /** 创建或初始化响应，并维护唯一性、初始状态和必要关联。 */
     private ExamStartResponse startResponse(Exam exam, ExamAttempt attempt, LocalDateTime now) {
         ExamPaper paper = paperService.getRequired(exam.getPaperId());
         runtimeStateService.rememberStarted(attempt.getId(), attempt.getDeadlineAt(), now);
@@ -155,6 +167,7 @@ public class CandidateExamSessionService {
         );
     }
 
+    /** 执行 eligibility 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private ExamEligibilityResponse eligibility(
             Exam exam,
             ExamCandidate candidate,
@@ -204,6 +217,7 @@ public class CandidateExamSessionService {
         );
     }
 
+    /** 校验开始Allowed及相关业务前置条件，不满足时抛出明确业务异常。 */
     private void assertStartAllowed(Exam exam, ExamCandidate candidate, LocalDateTime now) {
         if (!isPublished(exam)) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "考试尚未发布或已取消");
@@ -222,6 +236,7 @@ public class CandidateExamSessionService {
         }
     }
 
+    /** 校验作答CanContinue及相关业务前置条件，不满足时抛出明确业务异常。 */
     private void assertAttemptCanContinue(ExamAttempt attempt, LocalDateTime now) {
         if (attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS) {
             throw conflict("当前作答记录不能继续");
@@ -231,28 +246,34 @@ public class CandidateExamSessionService {
         }
     }
 
+    /** 判断是否满足Published条件，不修改持久化状态。 */
     private boolean isPublished(Exam exam) {
         return exam.getStatus() == ExamStatus.PUBLISHED
                 || exam.getStatus() == ExamStatus.ONGOING;
     }
 
+    /** 返回考生。 */
     private ExamCandidate getCandidate(Long examId, Long userId) {
         return candidateMapper.findOne(examId, userId)
                 .orElseThrow(() -> forbidden("你不是本场考试的指定考生"));
     }
 
+    /** 执行 remainingSeconds 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private long remainingSeconds(LocalDateTime deadline, LocalDateTime now) {
         return Math.max(0, Duration.between(now, deadline).getSeconds());
     }
 
+    /** 执行 now 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private LocalDateTime now() {
         return LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS);
     }
 
+    /** 执行 forbidden 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private BusinessException forbidden(String message) {
         return new BusinessException(ErrorCode.FORBIDDEN, message);
     }
 
+    /** 执行 conflict 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private BusinessException conflict(String message) {
         return new BusinessException(ErrorCode.CONFLICT, message);
     }

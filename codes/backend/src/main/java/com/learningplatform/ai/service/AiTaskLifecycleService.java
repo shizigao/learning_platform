@@ -1,3 +1,7 @@
+/* 文件职责：实现AI任务生命周期业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：AI 任务、对话、分析与供应商调用；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.ai.service;
 
 import com.learningplatform.ai.client.AiClient;
@@ -24,9 +28,12 @@ import java.util.List;
  */
 @Service
 public class AiTaskLifecycleService {
+    /** 访问任务持久化数据。 */
     private final AiTaskMapper taskMapper;
+    /** 通过AIClient调用隔离后的外部能力。 */
     private final AiClient aiClient;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public AiTaskLifecycleService(AiTaskMapper taskMapper, AiClient aiClient) {
         this.taskMapper = taskMapper;
         this.aiClient = aiClient;
@@ -97,7 +104,7 @@ public class AiTaskLifecycleService {
                 ));
     }
 
-    /** 返回适合接口输出的单个任务状态。 */
+    /** 查询目标相关数据；只返回当前调用方有权查看的结果。 */
     public AiTaskResponse detail(Long taskId, Long userId) {
         return AiTaskResponse.from(require(taskId, userId));
     }
@@ -109,6 +116,7 @@ public class AiTaskLifecycleService {
                 .toList();
     }
 
+    /** 校验Same请求及相关业务前置条件，不满足时抛出明确业务异常。 */
     private void assertSameRequest(
             AiTask task,
             Long userId,
@@ -127,12 +135,14 @@ public class AiTaskLifecycleService {
         }
     }
 
+    /** 转换或规范化请求ID数据，不引入额外持久化副作用。 */
     private String normalizeRequestId(String value) {
         return value == null || value.isBlank()
                 ? UUID.randomUUID().toString().replace("-", "")
                 : value.trim();
     }
 
+    /** 执行 limit 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private String limit(String value, int maxLength) {
         if (value == null) {
             return null;
@@ -140,6 +150,7 @@ public class AiTaskLifecycleService {
         return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 
+    /** 执行 now 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private LocalDateTime now() {
         return LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS);
     }
