@@ -1,3 +1,7 @@
+/* 文件职责：实现学习资料访问权业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：学习资料、分类、文件、审核与访问控制；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.content.service;
 
 import com.learningplatform.common.api.ErrorCode;
@@ -27,12 +31,18 @@ import java.time.LocalDateTime;
  */
 @Service
 public class ContentAccessService {
+    /** 访问学习资料持久化数据。 */
     private final LearningContentMapper contentMapper;
+    /** 访问文件持久化数据。 */
     private final ContentFileMapper fileMapper;
+    /** 委托权益执行对应领域规则。 */
     private final EntitlementService entitlementService;
+    /** 委托存储执行对应领域规则。 */
     private final MinioStorageService storageService;
+    /** 访问班级范围持久化数据。 */
     private final ClassScopeMapper classScopeMapper;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public ContentAccessService(
             LearningContentMapper contentMapper,
             ContentFileMapper fileMapper,
@@ -65,8 +75,9 @@ public class ContentAccessService {
         return entitlementService.hasActiveContentAccess(userId, content.getId());
     }
 
-    /** 返回可访问的已发布资料，否则抛出不泄露资源细节的业务异常。 */
+    /** 校验访问权及相关业务前置条件，不满足时抛出明确业务异常。 */
     public LearningContent requireAccess(Long contentId, Long userId, boolean requesterAdmin) {
+        // 尝试获得该资料的内容，点击getPublished
         LearningContent content = getPublished(contentId);
         if (!hasAccess(userId, requesterAdmin, content)) {
             if (content.getDistributionMode() == ContentDistributionMode.CLASS) {
@@ -128,7 +139,9 @@ public class ContentAccessService {
         return entitlement;
     }
 
+    /** 返回发布。 */
     private LearningContent getPublished(Long contentId) {
+        // 调用contentMapper.findById(contentId)，点击findById
         LearningContent content = contentMapper.findById(contentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "学习资料不存在"));
         if (content.getStatus() != ContentStatus.PUBLISHED) {
@@ -137,6 +150,7 @@ public class ContentAccessService {
         return content;
     }
 
+    /** 返回学习资料文件。 */
     private ContentFile getContentFile(Long contentId, Long fileId) {
         ContentFile file = fileMapper.findById(fileId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "资料文件不存在"));

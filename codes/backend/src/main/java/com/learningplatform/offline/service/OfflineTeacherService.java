@@ -1,3 +1,7 @@
+/* 文件职责：实现线下教学教师业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：线下教师申请、审核、检索与推荐；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.offline.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -32,12 +36,22 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
+/**
+ * 实现线下教学教师业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ *
+ * <p>职责边界：业务状态变化在此集中完成；跨表写入需保持事务一致性。</p>
+ */
 public class OfflineTeacherService {
+    /** 保存mapper，供该类型的业务逻辑读取或更新。 */
     private final OfflineTeachingMapper mapper;
+    /** 保存crypto，供该类型的业务逻辑读取或更新。 */
     private final TeacherSensitiveDataCrypto crypto;
+    /** 委托头像执行对应领域规则。 */
     private final UserAvatarService avatarService;
+    /** 访问object持久化数据。 */
     private final ObjectMapper objectMapper;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public OfflineTeacherService(
             OfflineTeachingMapper mapper,
             TeacherSensitiveDataCrypto crypto,
@@ -50,12 +64,14 @@ public class OfflineTeacherService {
         this.objectMapper = objectMapper;
     }
 
+    /** 执行 currentApplication 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public Optional<TeacherApplicationResponse> currentApplication(Long userId) {
         return mapper.findApplicationByUserId(userId)
                 .map(application -> applicationResponse(application, false));
     }
 
     @Transactional
+    /** 更新申请，通过返回值或版本条件识别并发状态变化。 */
     public TeacherApplicationResponse saveApplication(
             Long userId,
             TeacherApplicationRequest request
@@ -93,6 +109,7 @@ public class OfflineTeacherService {
     }
 
     @Transactional
+    /** 执行提交状态流转，仅允许从合法前置状态进入目标状态。 */
     public TeacherApplicationResponse submit(Long userId) {
         OfflineTeacherApplication application = mapper.findApplicationByUserId(userId)
                 .orElseThrow(() -> new BusinessException(
@@ -116,6 +133,7 @@ public class OfflineTeacherService {
         );
     }
 
+    /** 查询目标相关数据；只返回当前调用方有权查看的结果。 */
     public PageResult<TeacherProfileResponse> search(TeacherSearchQuery query) {
         long total = mapper.countProfiles(
                 query.getKeyword(),
@@ -138,6 +156,7 @@ public class OfflineTeacherService {
         return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
     }
 
+    /** 执行 publicProfile 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public TeacherProfileResponse publicProfile(Long profileId) {
         OfflineTeacherProfile profile = mapper.findProfileById(profileId)
                 .filter(value -> value.getStatus() == TeacherProfileStatus.ACTIVE)
@@ -148,6 +167,7 @@ public class OfflineTeacherService {
         return profileResponse(profile);
     }
 
+    /** 执行 publicProfileByUser 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public TeacherProfileResponse publicProfileByUser(Long userId) {
         OfflineTeacherProfile profile = mapper.findProfileByUserId(userId)
                 .filter(value -> value.getStatus() == TeacherProfileStatus.ACTIVE)
@@ -158,6 +178,7 @@ public class OfflineTeacherService {
         return profileResponse(profile);
     }
 
+    /** 执行 adminProfileByUser 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public TeacherProfileResponse adminProfileByUser(Long userId) {
         return profileResponse(
                 mapper.findProfileByUserId(userId)
@@ -168,6 +189,7 @@ public class OfflineTeacherService {
         );
     }
 
+    /** 执行 adminApplications 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public PageResult<TeacherApplicationSummary> adminApplications(
             TeacherApplicationAdminQuery query
     ) {
@@ -186,6 +208,7 @@ public class OfflineTeacherService {
         return PageResult.of(items, total, query.getPageNumber(), query.getPageSize());
     }
 
+    /** 执行 adminApplication 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public TeacherApplicationResponse adminApplication(Long applicationId) {
         return applicationResponse(
                 mapper.findApplicationById(applicationId)
@@ -198,6 +221,7 @@ public class OfflineTeacherService {
     }
 
     @Transactional
+    /** 执行审核通过状态流转，仅允许从合法前置状态进入目标状态。 */
     public TeacherApplicationResponse approve(Long applicationId, Long adminId) {
         LocalDateTime reviewedAt = now();
         if (mapper.reviewApplication(
@@ -223,6 +247,7 @@ public class OfflineTeacherService {
     }
 
     @Transactional
+    /** 执行驳回状态流转，仅允许从合法前置状态进入目标状态。 */
     public TeacherApplicationResponse reject(
             Long applicationId,
             Long adminId,
@@ -244,6 +269,7 @@ public class OfflineTeacherService {
         return adminApplication(applicationId);
     }
 
+    /** 更新资料状态，通过返回值或版本条件识别并发状态变化。 */
     public TeacherProfileResponse updateProfileStatus(
             Long profileId,
             TeacherProfileStatus status,
@@ -260,14 +286,17 @@ public class OfflineTeacherService {
         );
     }
 
+    /** 执行推荐Candidates核心计算或业务处理，并保证失败不会留下不一致的持久化结果。 */
     public List<OfflineTeacherProfile> recommendationCandidates(
             String province,
             String city,
             java.math.BigDecimal maxRate
     ) {
+        // 寻找推荐候选老师，点击findRecommendationCandidates
         return mapper.findRecommendationCandidates(province, city, maxRate);
     }
 
+    /** 执行 profileResponse 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public TeacherProfileResponse profileResponse(OfflineTeacherProfile profile) {
         return new TeacherProfileResponse(
                 profile.getId(),
@@ -298,6 +327,7 @@ public class OfflineTeacherService {
         );
     }
 
+    /** 执行 application 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private OfflineTeacherApplication application(
             TeacherApplicationRequest request,
             Long userId,
@@ -331,6 +361,7 @@ public class OfflineTeacherService {
         return application;
     }
 
+    /** 执行 applicationResponse 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private TeacherApplicationResponse applicationResponse(
             OfflineTeacherApplication application,
             boolean revealIdentity
@@ -370,6 +401,7 @@ public class OfflineTeacherService {
         );
     }
 
+    /** 执行 applicationSummary 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private TeacherApplicationSummary applicationSummary(
             TeacherApplicationAdminView application
     ) {
@@ -390,6 +422,7 @@ public class OfflineTeacherService {
         );
     }
 
+    /** 转换或规范化Tags数据，不引入额外持久化副作用。 */
     private List<String> normalizeTags(List<String> source) {
         LinkedHashSet<String> tags = new LinkedHashSet<>();
         source.forEach(value -> {
@@ -402,6 +435,7 @@ public class OfflineTeacherService {
         return List.copyOf(tags);
     }
 
+    /** 执行 tags 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private List<String> tags(String value) {
         if (value == null || value.isBlank()) return List.of();
         try {
@@ -411,6 +445,7 @@ public class OfflineTeacherService {
         }
     }
 
+    /** 执行 json 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private String json(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -419,6 +454,7 @@ public class OfflineTeacherService {
         }
     }
 
+    /** 校验Contact及相关业务前置条件，不满足时抛出明确业务异常。 */
     private void requireContact(String wechat, String qq, String email) {
         if (optional(wechat) == null && optional(qq) == null && optional(email) == null) {
             throw new BusinessException(
@@ -428,6 +464,7 @@ public class OfflineTeacherService {
         }
     }
 
+    /** 校验d原因及相关业务前置条件，不满足时抛出明确业务异常。 */
     private String requiredReason(String value, String message) {
         String normalized = optional(value);
         if (normalized == null) {
@@ -436,18 +473,22 @@ public class OfflineTeacherService {
         return normalized;
     }
 
+    /** 执行 clean 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private String clean(String value) {
         return value == null ? "" : value.trim();
     }
 
+    /** 执行 optional 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private String optional(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    /** 执行 now 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private LocalDateTime now() {
         return LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS);
     }
 
+    /** 执行 internal 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private BusinessException internal(String message) {
         return new BusinessException(ErrorCode.INTERNAL_ERROR, message);
     }

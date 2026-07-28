@@ -1,3 +1,7 @@
+/* 文件职责：实现AI会话业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：AI 任务、对话、分析与供应商调用；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.ai.service;
 
 import com.learningplatform.ai.client.AiClient;
@@ -31,21 +35,37 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
+/**
+ * 实现AI会话业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ *
+ * <p>职责边界：业务状态变化在此集中完成；跨表写入需保持事务一致性。</p>
+ */
 public class AiConversationService {
     private static final Logger LOGGER = LoggerFactory.getLogger(
             AiConversationService.class
     );
+    /** 通过AIClient调用隔离后的外部能力。 */
     private final AiClient aiClient;
+    /** 保存text提取器，供该类型的业务逻辑读取或更新。 */
     private final ContentTextExtractor textExtractor;
+    /** 委托访问权执行对应领域规则。 */
     private final ContentAccessService accessService;
+    /** 委托任务执行对应领域规则。 */
     private final AiTaskLifecycleService taskService;
+    /** 委托持久化执行对应领域规则。 */
     private final AiResultPersistenceService persistenceService;
+    /** 访问会话持久化数据。 */
     private final AiConversationMapper conversationMapper;
+    /** 访问消息持久化数据。 */
     private final AiMessageMapper messageMapper;
+    /** 保存提示词工厂，供该类型的业务逻辑读取或更新。 */
     private final AiConversationPromptFactory promptFactory;
+    /** 委托额度执行对应领域规则。 */
     private final AiQuotaService quotaService;
+    /** 保存请求保护，供该类型的业务逻辑读取或更新。 */
     private final AiRequestGuard requestGuard;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public AiConversationService(
             AiClient aiClient,
             ContentTextExtractor textExtractor,
@@ -71,6 +91,7 @@ public class AiConversationService {
     }
 
     @Transactional
+    /** 创建或初始化，并维护唯一性、初始状态和必要关联。 */
     public AiConversationResponse create(
             Long contentId,
             Long userId,
@@ -93,6 +114,7 @@ public class AiConversationService {
         return detail(conversation.getId(), userId, requesterAdmin);
     }
 
+    /** 查询目标相关数据；只返回当前调用方有权查看的结果。 */
     public List<AiConversationResponse> list(
             Long contentId,
             Long userId,
@@ -104,6 +126,7 @@ public class AiConversationService {
                 .toList();
     }
 
+    /** 查询目标相关数据；只返回当前调用方有权查看的结果。 */
     public AiConversationResponse detail(
             Long conversationId,
             Long userId,
@@ -121,6 +144,7 @@ public class AiConversationService {
         );
     }
 
+    /** 执行explain核心计算或业务处理，并保证失败不会留下不一致的持久化结果。 */
     public AiExplanationResponse explain(
             Long conversationId,
             Long userId,
@@ -139,6 +163,7 @@ public class AiConversationService {
         );
     }
 
+    /** 执行explain模板核心计算或业务处理，并保证失败不会留下不一致的持久化结果。 */
     public AiExplanationResponse explainTemplate(
             Long conversationId,
             Long userId,
@@ -156,6 +181,7 @@ public class AiConversationService {
         );
     }
 
+    /** 执行explainInternal核心计算或业务处理，并保证失败不会留下不一致的持久化结果。 */
     private AiExplanationResponse explainInternal(
             Long conversationId,
             Long userId,
@@ -304,11 +330,13 @@ public class AiConversationService {
         }
     }
 
+    /** 执行 traceId 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private String traceId() {
         String value = MDC.get("traceId");
         return value == null || value.isBlank() ? "-" : value;
     }
 
+    /** 执行 existingExplanation 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private AiExplanationResponse existingExplanation(AiTask task, Long userId) {
         if (task.getStatus() == AiTaskStatus.SUCCEEDED) {
             AiMessage answer = messageMapper.findAssistantByTaskId(task.getId())
@@ -343,6 +371,7 @@ public class AiConversationService {
         throw new BusinessException(ErrorCode.CONFLICT, "AI 讲解任务正在处理中");
     }
 
+    /** 执行 explanationResponse 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private AiExplanationResponse explanationResponse(
             AiResultPersistenceService.ExplanationMessages saved
     ) {
@@ -354,6 +383,7 @@ public class AiConversationService {
         );
     }
 
+    /** 校验Owned及相关业务前置条件，不满足时抛出明确业务异常。 */
     private AiConversation requireOwned(Long conversationId, Long userId) {
         return conversationMapper.findByIdAndUser(conversationId, userId)
                 .orElseThrow(() -> new BusinessException(
@@ -362,6 +392,7 @@ public class AiConversationService {
                 ));
     }
 
+    /** 执行 response 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private AiConversationResponse response(
             AiConversation conversation,
             List<AiMessage> messages
@@ -378,6 +409,7 @@ public class AiConversationService {
         );
     }
 
+    /** 执行 title 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private String title(String requested, String contentTitle) {
         String value = requested == null || requested.isBlank()
                 ? contentTitle + " · AI讲解"

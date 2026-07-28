@@ -1,3 +1,7 @@
+/* 文件职责：定义考试的 MyBatis 查询和写入操作，是业务服务访问数据库的持久化端口。
+ * 所属模块：试卷、考试、作答、阅卷、统计与错题；所在分层：MyBatis 持久化层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.exam.mapper;
 
 import com.learningplatform.exam.domain.Exam;
@@ -14,7 +18,13 @@ import java.util.List;
 import java.util.Optional;
 
 @Mapper
+/**
+ * 定义考试的 MyBatis 查询和写入操作，是业务服务访问数据库的持久化端口。
+ *
+ * <p>职责边界：只表达数据库读写语义，不在 SQL 映射层做权限和业务决策。</p>
+ */
 public interface ExamMapper {
+    /** 复用学习资料查询列，保证不同查询返回一致字段集合。 */
     String COLUMNS = """
             e.id, e.publisher_id, e.paper_id, e.name, e.instructions, e.assignment_mode,
             e.start_at, e.end_at, e.duration_minutes, e.passing_score,
@@ -29,6 +39,7 @@ public interface ExamMapper {
             FROM exam e
             WHERE e.id = #{id} AND e.deleted = 0
             """)
+    /** 执行 findById 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<Exam> findById(Long id);
 
     @Select("""
@@ -38,6 +49,7 @@ public interface ExamMapper {
             WHERE e.id = #{id} AND e.deleted = 0
             FOR UPDATE
             """)
+    /** 执行 findByIdForUpdate 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<Exam> findByIdForUpdate(Long id);
 
     @Insert("""
@@ -53,6 +65,7 @@ public interface ExamMapper {
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
+    /** 插入新记录，并返回受影响行数；配置生成主键时同时回填实体 ID。 */
     int insert(Exam exam);
 
     @Update("""
@@ -71,6 +84,7 @@ public interface ExamMapper {
             WHERE id = #{id} AND publisher_id = #{publisherId}
               AND deleted = 0 AND status = 'DRAFT'
             """)
+    /** 执行 updateDraft 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int updateDraft(Exam exam);
 
     @Update("""
@@ -78,6 +92,7 @@ public interface ExamMapper {
             SET status = 'PUBLISHED', published_at = #{publishedAt}, version = version + 1
             WHERE id = #{id} AND deleted = 0 AND status = 'DRAFT'
             """)
+    /** 执行 publish 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int publish(@Param("id") Long id, @Param("publishedAt") LocalDateTime publishedAt);
 
     @Update("""
@@ -85,6 +100,7 @@ public interface ExamMapper {
             SET status = 'CANCELLED', version = version + 1
             WHERE id = #{id} AND deleted = 0 AND status = 'PUBLISHED'
             """)
+    /** 判断是否满足cel条件，不修改持久化状态。 */
     int cancel(Long id);
 
     @Update("""
@@ -93,6 +109,7 @@ public interface ExamMapper {
             WHERE id = #{id} AND publisher_id = #{publisherId}
               AND deleted = 0 AND status = 'DRAFT'
             """)
+    /** 执行 softDelete 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int softDelete(@Param("id") Long id, @Param("publisherId") Long publisherId);
 
     @Select("""
@@ -104,6 +121,7 @@ public interface ExamMapper {
             <if test='keyword != null'>AND e.name LIKE CONCAT('%', #{keyword}, '%')</if>
             </script>
             """)
+    /** 执行 countByPublisher 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     long countByPublisher(
             @Param("publisherId") Long publisherId,
             @Param("status") ExamStatus status,
@@ -122,6 +140,7 @@ public interface ExamMapper {
             LIMIT #{limit} OFFSET #{offset}
             </script>
             """)
+    /** 执行 findByPublisher 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     List<Exam> findByPublisher(
             @Param("publisherId") Long publisherId,
             @Param("status") ExamStatus status,
@@ -140,6 +159,7 @@ public interface ExamMapper {
             <if test='keyword != null'>AND e.name LIKE CONCAT('%', #{keyword}, '%')</if>
             </script>
             """)
+    /** 执行 countForAdmin 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     long countForAdmin(
             @Param("publisherId") Long publisherId,
             @Param("status") ExamStatus status,
@@ -159,6 +179,7 @@ public interface ExamMapper {
             LIMIT #{limit} OFFSET #{offset}
             </script>
             """)
+    /** 执行 findForAdmin 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     List<Exam> findForAdmin(
             @Param("publisherId") Long publisherId,
             @Param("status") ExamStatus status,
@@ -191,5 +212,6 @@ public interface ExamMapper {
               AND e.status IN ('PUBLISHED', 'ONGOING', 'FINISHED')
             ORDER BY e.start_at DESC, e.id DESC
             """)
+    /** 执行 findAssignedToCandidate 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     List<Exam> findAssignedToCandidate(Long userId);
 }

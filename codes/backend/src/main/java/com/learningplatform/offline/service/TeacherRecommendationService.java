@@ -1,3 +1,7 @@
+/* 文件职责：实现教师推荐业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：线下教师申请、审核、检索与推荐；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.offline.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -57,6 +61,7 @@ import java.util.stream.Collectors;
  */
 @Service
 public class TeacherRecommendationService {
+    /** 记录关键状态变化、外部调用阶段和可关联 traceId 的安全日志。 */
     private static final Logger log =
             LoggerFactory.getLogger(TeacherRecommendationService.class);
     /** 约束模型只做候选排序并返回可校验 JSON，防御候选数据中的提示词注入。 */
@@ -69,15 +74,24 @@ public class TeacherRecommendationService {
             "matchHighlights":["匹配点"]}]}。若没有合适教师，返回空数组。
             """;
 
+    /** 保存mapper，供该类型的业务逻辑读取或更新。 */
     private final OfflineTeachingMapper mapper;
+    /** 委托教师执行对应领域规则。 */
     private final OfflineTeacherService teacherService;
+    /** 通过AIClient调用隔离后的外部能力。 */
     private final AiClient aiClient;
+    /** 保存请求保护，供该类型的业务逻辑读取或更新。 */
     private final AiRequestGuard requestGuard;
+    /** 委托任务执行对应领域规则。 */
     private final AiTaskLifecycleService taskService;
+    /** 委托额度执行对应领域规则。 */
     private final AiQuotaService quotaService;
+    /** 委托持久化执行对应领域规则。 */
     private final TeacherRecommendationPersistenceService persistenceService;
+    /** 访问object持久化数据。 */
     private final ObjectMapper objectMapper;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public TeacherRecommendationService(
             OfflineTeachingMapper mapper,
             OfflineTeacherService teacherService,
@@ -128,6 +142,7 @@ public class TeacherRecommendationService {
             Long userId,
             RecommendationGenerateRequest request
     ) {
+        // 学生要先填写自己的偏好信息
         StudentPreferenceRequest preferenceRequest = request.preference() == null
                 ? preference(userId)
                 : savePreference(userId, request.preference());
@@ -137,6 +152,8 @@ public class TeacherRecommendationService {
                     "请先填写并保存学习需求"
             );
         }
+        // candidates(preferenceRequest)实现本地数据库排序算法，排序选出最多20个适合的教师
+        // 点击candidates
         List<ScoredTeacher> candidates = candidates(preferenceRequest);
         if (candidates.isEmpty()) {
             throw new BusinessException(
@@ -150,6 +167,7 @@ public class TeacherRecommendationService {
                 .toList());
         String input = "{\"student\":" + preferenceJson
                 + ",\"candidateTeachers\":" + candidateJson + "}";
+        // 创建AItask
         AiTaskLifecycleService.TaskCreation creation = taskService.create(
                 request.requestId(),
                 userId,
@@ -174,10 +192,12 @@ public class TeacherRecommendationService {
             throw exception;
         }
         try {
+            // 发起API请求
             AiClientResponse aiResponse = requestGuard.execute(
                     userId,
                     () -> aiClient.complete(new AiClientRequest(
                             List.of(
+                                    // SYSTEM_PROMPT为AI推荐教师的系统提示词
                                     new AiMessage(AiRole.SYSTEM, SYSTEM_PROMPT),
                                     new AiMessage(AiRole.USER, input)
                             ),
@@ -220,6 +240,7 @@ public class TeacherRecommendationService {
         }
     }
 
+    /** 执行 existing 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private TeacherRecommendationResponse existing(
             AiTask task,
             List<ScoredTeacher> candidates
@@ -254,6 +275,7 @@ public class TeacherRecommendationService {
         );
     }
 
+    /** 执行 fallback 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private TeacherRecommendationResponse fallback(
             AiTask task,
             List<ScoredTeacher> candidates,
@@ -277,6 +299,7 @@ public class TeacherRecommendationService {
 
     /** 从数据库召回候选，本地评分降序、ID 升序稳定排序后限制为 20 人。 */
     private List<ScoredTeacher> candidates(StudentPreferenceRequest preference) {
+        // 点击recommendationCandidates
         return teacherService.recommendationCandidates(
                         preference.province(),
                         preference.city(),
@@ -284,14 +307,17 @@ public class TeacherRecommendationService {
                                 ? new java.math.BigDecimal("99999999")
                                 : preference.maxHourlyRate()
                 ).stream()
+                // 点击score,进入本地排序核心算法
                 .map(profile -> new ScoredTeacher(profile, score(profile, preference)))
                 .sorted(Comparator.comparingInt(ScoredTeacher::score).reversed()
                         .thenComparing(value -> value.profile().getId()))
+                // 只取前20名
                 .limit(20)
                 .toList();
     }
 
     /** 计算 0–100 的本地解释性匹配分，不依赖外部 AI。 */
+    // 本地排序核心算法
     private int score(
             OfflineTeacherProfile teacher,
             StudentPreferenceRequest preference
@@ -341,6 +367,7 @@ public class TeacherRecommendationService {
         return (int) Math.min(15, shared * 3);
     }
 
+    /** 执行 scheduleTokens 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private Set<String> scheduleTokens(String value) {
         Set<String> result = new java.util.LinkedHashSet<>(tokens(value));
         List.of(
@@ -398,6 +425,7 @@ public class TeacherRecommendationService {
         return List.copyOf(result.values());
     }
 
+    /** 执行 response 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private TeacherRecommendationResponse response(
             OfflineTeacherRecommendation saved,
             AiTask task,
@@ -436,6 +464,7 @@ public class TeacherRecommendationService {
         );
     }
 
+    /** 执行 fallbackItems 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private List<TeacherRecommendationItem> fallbackItems(
             List<ScoredTeacher> candidates
     ) {
@@ -449,6 +478,7 @@ public class TeacherRecommendationService {
                 .toList();
     }
 
+    /** 执行 item 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private TeacherRecommendationItem item(
             ScoredTeacher value,
             String reason,
@@ -464,6 +494,7 @@ public class TeacherRecommendationService {
         );
     }
 
+    /** 执行 localHighlights 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private List<String> localHighlights(ScoredTeacher value) {
         List<String> highlights = new ArrayList<>();
         highlights.add("系统基础匹配分 " + value.score());
@@ -476,6 +507,7 @@ public class TeacherRecommendationService {
         return highlights;
     }
 
+    /** 执行 safeCandidate 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private SafeCandidate safeCandidate(ScoredTeacher value) {
         OfflineTeacherProfile profile = value.profile();
         return new SafeCandidate(
@@ -497,6 +529,7 @@ public class TeacherRecommendationService {
         );
     }
 
+    /** 转换或规范化Tags数据，不引入额外持久化副作用。 */
     private List<String> parseTags(String json) {
         try {
             return objectMapper.readValue(json, new TypeReference<>() { });
@@ -505,6 +538,7 @@ public class TeacherRecommendationService {
         }
     }
 
+    /** 执行 preference 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private OfflineStudentPreference preference(
             Long userId,
             StudentPreferenceRequest request
@@ -525,6 +559,7 @@ public class TeacherRecommendationService {
         return preference;
     }
 
+    /** 执行 preferenceResponse 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private StudentPreferenceRequest preferenceResponse(
             OfflineStudentPreference value
     ) {
@@ -543,6 +578,7 @@ public class TeacherRecommendationService {
         );
     }
 
+    /** 执行 json 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private String json(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -554,6 +590,7 @@ public class TeacherRecommendationService {
         }
     }
 
+    /** 执行 sha256 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private String sha256(String value) {
         try {
             return HexFormat.of().formatHex(
@@ -565,32 +602,39 @@ public class TeacherRecommendationService {
         }
     }
 
+    /** 转换或规范化kens数据，不引入额外持久化副作用。 */
     private Set<String> tokens(String value) {
         return Arrays.stream(value.split("[\\s,，。；;、/]+"))
                 .filter(token -> !token.isBlank())
                 .collect(Collectors.toSet());
     }
 
+    /** 执行 safeCause 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private String safeCause(String value) {
         String normalized = text(value).trim();
         return normalized.isBlank() ? "服务暂时不可用" : limit(normalized, 80);
     }
 
+    /** 执行 optional 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private String optional(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    /** 执行 text 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private String text(String value) {
         return value == null ? "" : value;
     }
 
+    /** 执行 limit 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private String limit(String value, int max) {
         return value.length() <= max ? value : value.substring(0, max);
     }
 
+    /** 执行Scored教师核心计算或业务处理，并保证失败不会留下不一致的持久化结果。 */
     private record ScoredTeacher(OfflineTeacherProfile profile, int score) {
     }
 
+    /** 执行 SafeCandidate 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private record SafeCandidate(
             Long teacherId,
             String teacherName,
@@ -610,9 +654,11 @@ public class TeacherRecommendationService {
     ) {
     }
 
+    /** 执行 AiSelectionEnvelope 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private record AiSelectionEnvelope(List<AiSelection> recommendations) {
     }
 
+    /** 执行 AiSelection 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private record AiSelection(
             Long teacherId,
             String reason,
@@ -620,6 +666,7 @@ public class TeacherRecommendationService {
     ) {
     }
 
+    /** 执行 StoredSelection 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private record StoredSelection(
             Long teacherId,
             String reason,

@@ -1,3 +1,7 @@
+/* 文件职责：实现考试交卷业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：试卷、考试、作答、阅卷、统计与错题；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.exam.service;
 
 import com.learningplatform.common.api.ErrorCode;
@@ -17,14 +21,26 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
 @Service
+/**
+ * 实现考试交卷业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ *
+ * <p>职责边界：业务状态变化在此集中完成；跨表写入需保持事务一致性。</p>
+ */
 public class ExamSubmissionService {
+    /** 访问作答持久化数据。 */
     private final ExamAttemptMapper attemptMapper;
+    /** 访问考生持久化数据。 */
     private final ExamCandidateMapper candidateMapper;
+    /** 访问答案持久化数据。 */
     private final ExamAnswerMapper answerMapper;
+    /** 委托运行态State执行对应领域规则。 */
     private final ExamRuntimeStateService runtimeStateService;
+    /** 委托考试执行对应领域规则。 */
     private final ExamService examService;
+    /** 委托阅卷执行对应领域规则。 */
     private final ExamGradingService gradingService;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public ExamSubmissionService(
             ExamAttemptMapper attemptMapper,
             ExamCandidateMapper candidateMapper,
@@ -42,6 +58,7 @@ public class ExamSubmissionService {
     }
 
     @Transactional
+    /** 执行提交状态流转，仅允许从合法前置状态进入目标状态。 */
     public ExamSubmissionResponse submitManual(Long examId, Long userId) {
         ExamAttempt attempt = attemptMapper.findFirstForUpdate(examId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.CONFLICT, "请先开始考试"));
@@ -61,6 +78,7 @@ public class ExamSubmissionService {
     }
 
     @Transactional
+    /** 执行提交状态流转，仅允许从合法前置状态进入目标状态。 */
     public boolean submitExpired(Long attemptId) {
         ExamAttempt attempt = attemptMapper.findByIdForUpdate(attemptId).orElse(null);
         if (attempt == null || attempt.getStatus() != ExamAttemptStatus.IN_PROGRESS) {
@@ -74,6 +92,7 @@ public class ExamSubmissionService {
         return true;
     }
 
+    /** 执行完成状态流转，仅允许从合法前置状态进入目标状态。 */
     private ExamSubmissionResponse complete(
             ExamAttempt attempt,
             ExamSubmissionType type,
@@ -92,6 +111,7 @@ public class ExamSubmissionService {
         return response(attempt);
     }
 
+    /** 执行 response 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private ExamSubmissionResponse response(ExamAttempt attempt) {
         return new ExamSubmissionResponse(
                 attempt.getId(),
@@ -103,6 +123,7 @@ public class ExamSubmissionService {
         );
     }
 
+    /** 执行 now 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private LocalDateTime now() {
         return LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS);
     }

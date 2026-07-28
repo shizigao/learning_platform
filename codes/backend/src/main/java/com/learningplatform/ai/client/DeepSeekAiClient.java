@@ -1,3 +1,7 @@
+/* 文件职责：定义或实现DeepSeek AI 客户端外部调用适配，隔离供应商协议与业务服务。
+ * 所属模块：AI 任务、对话、分析与供应商调用；所在分层：外部服务适配层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.ai.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -20,15 +24,27 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * 定义或实现DeepSeek AI 客户端外部调用适配，隔离供应商协议与业务服务。
+ *
+ * <p>职责边界：负责协议转换、超时和安全日志，不直接扣减业务权益。</p>
+ */
 public class DeepSeekAiClient implements AiClient {
+    /** 定义 PROVIDER 常量，统一该组件使用的固定规则或默认值。 */
     private static final String PROVIDER = "deepseek";
     private static final Logger LOGGER = LoggerFactory.getLogger(DeepSeekAiClient.class);
+    /** 保存model，供该类型的业务逻辑读取或更新。 */
     private final String model;
+    /** 保存endpoint，供该类型的业务逻辑读取或更新。 */
     private final String endpoint;
+    /** 保存thinking启用状态，供该类型的业务逻辑读取或更新。 */
     private final boolean thinkingEnabled;
+    /** 通过restClient调用隔离后的外部能力。 */
     private final RestClient restClient;
+    /** 访问object持久化数据。 */
     private final ObjectMapper objectMapper;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public DeepSeekAiClient(AiProperties.DeepSeek properties) {
         this(properties, RestClient.builder(), true);
     }
@@ -40,6 +56,7 @@ public class DeepSeekAiClient implements AiClient {
         this(properties, builder, false);
     }
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     private DeepSeekAiClient(
             AiProperties.DeepSeek properties,
             RestClient.Builder builder,
@@ -83,16 +100,19 @@ public class DeepSeekAiClient implements AiClient {
     }
 
     @Override
+    /** 执行 provider 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     public String provider() {
         return PROVIDER;
     }
 
     @Override
+    /** 执行 model 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     public String model() {
         return model;
     }
 
     @Override
+    /** 执行完成状态流转，仅允许从合法前置状态进入目标状态。 */
     public AiClientResponse complete(AiClientRequest request) {
         long startedAt = System.nanoTime();
         String traceId = traceId();
@@ -190,6 +210,7 @@ public class DeepSeekAiClient implements AiClient {
         }
     }
 
+    /** 转换或规范化数据，不引入额外持久化副作用。 */
     private AiClientResponse normalize(
             DeepSeekResponse response,
             String traceId,
@@ -235,6 +256,7 @@ public class DeepSeekAiClient implements AiClient {
         );
     }
 
+    /** 执行 logFailure 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private void logFailure(
             String traceId,
             long startedAt,
@@ -254,6 +276,7 @@ public class DeepSeekAiClient implements AiClient {
         );
     }
 
+    /** 执行 safeCause 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private String safeCause(Throwable exception) {
         Throwable current = exception;
         int depth = 0;
@@ -271,23 +294,28 @@ public class DeepSeekAiClient implements AiClient {
                 + (normalized.isEmpty() ? "" : ": " + normalized);
     }
 
+    /** 执行 elapsedMillis 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private long elapsedMillis(long startedAt) {
         return Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
     }
 
+    /** 执行 traceId 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private String traceId() {
         String value = MDC.get("traceId");
         return value == null || value.isBlank() ? "-" : value;
     }
 
+    /** 执行 safeHttpException 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private AiClientException safeHttpException(RestClientResponseException exception) {
         return safeHttpStatus(exception.getStatusCode().value(), exception);
     }
 
+    /** 执行 safeHttpStatus 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private AiClientException safeHttpStatus(int status) {
         return safeHttpStatus(status, null);
     }
 
+    /** 执行 safeHttpStatus 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private AiClientException safeHttpStatus(int status, Throwable cause) {
         AiClientException.Kind kind;
         if (status == 401 || status == 403) {
@@ -304,10 +332,12 @@ public class DeepSeekAiClient implements AiClient {
         );
     }
 
+    /** 执行 nonNegative 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private int nonNegative(Integer value) {
         return value == null ? 0 : Math.max(value, 0);
     }
 
+    /** 执行 stripTrailingSlash 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private String stripTrailingSlash(String value) {
         String normalized = value.trim();
         while (normalized.endsWith("/")) {
@@ -316,6 +346,7 @@ public class DeepSeekAiClient implements AiClient {
         return normalized;
     }
 
+    /** 校验Text及相关业务前置条件，不满足时抛出明确业务异常。 */
     private String requireText(String value, String message) {
         if (value == null || value.isBlank()) {
             throw configuration(message);
@@ -323,11 +354,13 @@ public class DeepSeekAiClient implements AiClient {
         return value.trim();
     }
 
+    /** 执行 configuration 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private AiClientException configuration(String message) {
         return new AiClientException(AiClientException.Kind.CONFIGURATION, message);
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
+    /** 执行 DeepSeekRequest 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private record DeepSeekRequest(
             String model,
             List<ProviderMessage> messages,
@@ -340,16 +373,20 @@ public class DeepSeekAiClient implements AiClient {
     ) {
     }
 
+    /** 执行 ProviderResponseFormat 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private record ProviderResponseFormat(String type) {
     }
 
+    /** 执行 ProviderThinking 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private record ProviderThinking(String type) {
     }
 
+    /** 执行 ProviderMessage 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private record ProviderMessage(String role, String content) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    /** 执行 DeepSeekResponse 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private record DeepSeekResponse(
             String id,
             String model,
@@ -359,6 +396,7 @@ public class DeepSeekAiClient implements AiClient {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    /** 执行 Choice 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private record Choice(
             ProviderMessage message,
             @JsonProperty("finish_reason") String finishReason
@@ -366,6 +404,7 @@ public class DeepSeekAiClient implements AiClient {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    /** 执行 Usage 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private record Usage(
             @JsonProperty("prompt_tokens") Integer promptTokens,
             @JsonProperty("completion_tokens") Integer completionTokens,

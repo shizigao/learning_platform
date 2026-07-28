@@ -73,6 +73,7 @@ export async function recommendTeachers(
   preference: StudentPreference,
 ): Promise<TeacherRecommendation> {
   return data(
+    // 向后端发起请求
     await http.post<ApiResponse<TeacherRecommendation>>(
       '/offline-teaching/recommendations',
       { requestId, preference },

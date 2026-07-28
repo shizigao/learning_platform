@@ -1,3 +1,7 @@
+/* 文件职责：提供考生考试相关 HTTP 接口，负责请求校验、身份解析、权限入口和统一响应封装。
+ * 所属模块：试卷、考试、作答、阅卷、统计与错题；所在分层：HTTP 接口层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.exam.web;
 
 import com.learningplatform.auth.security.AuthenticationPrincipalResolver;
@@ -35,14 +39,26 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/exams")
+/**
+ * 提供考生考试相关 HTTP 接口，负责请求校验、身份解析、权限入口和统一响应封装。
+ *
+ * <p>职责边界：只处理 HTTP 协议和身份入口，不直接编写 SQL 或复制领域规则。</p>
+ */
 public class CandidateExamController {
+    /** 委托考试执行对应领域规则。 */
     private final ExamService examService;
+    /** 委托session执行对应领域规则。 */
     private final CandidateExamSessionService sessionService;
+    /** 委托答案执行对应领域规则。 */
     private final ExamAnswerService answerService;
+    /** 委托交卷执行对应领域规则。 */
     private final ExamSubmissionService submissionService;
+    /** 委托成绩执行对应领域规则。 */
     private final ExamResultService resultService;
+    /** 委托AI分析执行对应领域规则。 */
     private final ExamAiAnalysisService aiAnalysisService;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public CandidateExamController(
             ExamService examService,
             CandidateExamSessionService sessionService,
@@ -60,12 +76,14 @@ public class CandidateExamController {
     }
 
     @GetMapping
+    /** 处理 GET 当前资源 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<List<ExamSummaryResponse>> list(Authentication authentication) {
         Long userId = AuthenticationPrincipalResolver.require(authentication).userId();
         return ApiResponse.success(examService.listAssigned(userId));
     }
 
     @GetMapping("/{examId}")
+    /** 处理 GET /{examId} 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<CandidateExamResponse> detail(
             Authentication authentication,
             @PathVariable Long examId
@@ -75,6 +93,7 @@ public class CandidateExamController {
     }
 
     @GetMapping("/{examId}/overview")
+    /** 处理 GET /{examId}/overview 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<CandidateExamOverviewResponse> overview(
             Authentication authentication,
             @PathVariable Long examId
@@ -84,6 +103,7 @@ public class CandidateExamController {
     }
 
     @GetMapping("/{examId}/eligibility")
+    /** 处理 GET /{examId}/eligibility 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<ExamEligibilityResponse> eligibility(
             Authentication authentication,
             @PathVariable Long examId
@@ -93,6 +113,7 @@ public class CandidateExamController {
     }
 
     @PostMapping("/{examId}/start")
+    /** 处理 POST /{examId}/start 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<ExamStartResponse> start(
             Authentication authentication,
             @PathVariable Long examId
@@ -102,6 +123,7 @@ public class CandidateExamController {
     }
 
     @GetMapping("/{examId}/session")
+    /** 处理 GET /{examId}/session 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<ExamStartResponse> session(
             Authentication authentication,
             @PathVariable Long examId
@@ -111,6 +133,7 @@ public class CandidateExamController {
     }
 
     @PutMapping("/{examId}/answers/{questionId}")
+    /** 处理 PUT /{examId}/answers/{questionId} 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<ExamAnswerResponse> saveAnswer(
             Authentication authentication,
             @PathVariable Long examId,
@@ -122,6 +145,7 @@ public class CandidateExamController {
     }
 
     @PutMapping("/{examId}/answers")
+    /** 处理 PUT /{examId}/answers 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<List<ExamAnswerResponse>> saveAnswers(
             Authentication authentication,
             @PathVariable Long examId,
@@ -132,6 +156,7 @@ public class CandidateExamController {
     }
 
     @PostMapping("/{examId}/submit")
+    /** 处理 POST /{examId}/submit 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<ExamSubmissionResponse> submit(
             Authentication authentication,
             @PathVariable Long examId
@@ -141,6 +166,7 @@ public class CandidateExamController {
     }
 
     @GetMapping("/{examId}/result")
+    /** 处理 GET /{examId}/result 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<ExamResultDetailResponse> result(
             Authentication authentication,
             @PathVariable Long examId
@@ -150,6 +176,7 @@ public class CandidateExamController {
     }
 
     @GetMapping("/{examId}/result/ai-analysis")
+    /** 处理 GET /{examId}/result/ai-analysis 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<ExamAiAnalysisPageResponse> resultAiAnalysis(
             Authentication authentication,
             @PathVariable Long examId
@@ -159,6 +186,7 @@ public class CandidateExamController {
     }
 
     @PostMapping("/{examId}/result/ai-analysis")
+    /** 处理 POST /{examId}/result/ai-analysis 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<ExamAiAnalysisResponse> generateResultAiAnalysis(
             Authentication authentication,
             @PathVariable Long examId,

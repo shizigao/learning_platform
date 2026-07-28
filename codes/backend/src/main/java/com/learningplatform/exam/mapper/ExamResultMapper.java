@@ -1,3 +1,7 @@
+/* 文件职责：定义考试成绩的 MyBatis 查询和写入操作，是业务服务访问数据库的持久化端口。
+ * 所属模块：试卷、考试、作答、阅卷、统计与错题；所在分层：MyBatis 持久化层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.exam.mapper;
 
 import com.learningplatform.exam.domain.ExamResult;
@@ -12,7 +16,13 @@ import java.util.Optional;
 import java.util.List;
 
 @Mapper
+/**
+ * 定义考试成绩的 MyBatis 查询和写入操作，是业务服务访问数据库的持久化端口。
+ *
+ * <p>职责边界：只表达数据库读写语义，不在 SQL 映射层做权限和业务决策。</p>
+ */
 public interface ExamResultMapper {
+    /** 复用学习资料查询列，保证不同查询返回一致字段集合。 */
     String COLUMNS = """
             id, exam_id, attempt_id, user_id, total_score, passing_score,
             passed, correct_count, incorrect_count, unanswered_count,
@@ -26,6 +36,7 @@ public interface ExamResultMapper {
             FROM exam_result
             WHERE attempt_id = #{attemptId}
             """)
+    /** 执行 findByAttemptId 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<ExamResult> findByAttemptId(Long attemptId);
 
     @Select("""
@@ -38,6 +49,7 @@ public interface ExamResultMapper {
             WHERE r.exam_id = #{examId} AND r.user_id = #{userId}
               AND a.attempt_no = 1
             """)
+    /** 执行 findCandidateResult 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<ExamResult> findCandidateResult(
             @org.apache.ibatis.annotations.Param("examId") Long examId,
             @org.apache.ibatis.annotations.Param("userId") Long userId
@@ -62,6 +74,7 @@ public interface ExamResultMapper {
             ORDER BY r.generated_at DESC, r.id DESC
             LIMIT 5
             """)
+    /** 执行 findRecentCompletedForWrongReview 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     List<WrongReviewExam> findRecentCompletedForWrongReview(Long userId);
 
     @Insert("""
@@ -76,6 +89,7 @@ public interface ExamResultMapper {
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
+    /** 插入新记录，并返回受影响行数；配置生成主键时同时回填实体 ID。 */
     int insert(ExamResult result);
 
     @Update("""
@@ -91,5 +105,6 @@ public interface ExamResultMapper {
                 generated_at = #{generatedAt}
             WHERE attempt_id = #{attemptId}
             """)
+    /** 执行 update 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int update(ExamResult result);
 }

@@ -1,3 +1,7 @@
+/* 文件职责：实现用户头像业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：用户、角色、头像与公开个人中心；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.user.service;
 
 import com.learningplatform.common.api.ErrorCode;
@@ -25,8 +29,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
+/**
+ * 实现用户头像业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ *
+ * <p>职责边界：业务状态变化在此集中完成；跨表写入需保持事务一致性。</p>
+ */
 public class UserAvatarService {
     private static final Logger log = LoggerFactory.getLogger(UserAvatarService.class);
+    /** 定义 MAX_AVATAR_BYTES 常量，统一该组件使用的固定规则或默认值。 */
     private static final long MAX_AVATAR_BYTES = 5L * 1024L * 1024L;
     private static final Map<String, String> ALLOWED_TYPES = Map.of(
             "jpg", "image/jpeg",
@@ -35,12 +45,18 @@ public class UserAvatarService {
             "webp", "image/webp"
     );
 
+    /** 访问头像持久化数据。 */
     private final UserAvatarMapper avatarMapper;
+    /** 委托用户执行对应领域规则。 */
     private final UserService userService;
+    /** 通过minioClient调用隔离后的外部能力。 */
     private final MinioClient minioClient;
+    /** 保存minio配置属性，供该类型的业务逻辑读取或更新。 */
     private final MinioProperties minioProperties;
+    /** 保存signature校验器，供该类型的业务逻辑读取或更新。 */
     private final FileContentSignatureValidator signatureValidator;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public UserAvatarService(
             UserAvatarMapper avatarMapper,
             UserService userService,
@@ -55,6 +71,7 @@ public class UserAvatarService {
         this.signatureValidator = signatureValidator;
     }
 
+    /** 执行 avatarUrl 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public String avatarUrl(User user) {
         if (user == null || user.getId() == null) return null;
         return avatarMapper.findByUserId(user.getId())
@@ -62,6 +79,7 @@ public class UserAvatarService {
                 .orElse(user.getAvatarUrl());
     }
 
+    /** 执行 avatarUrl 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public String avatarUrl(Long userId) {
         if (userId == null) return null;
         return avatarMapper.findByUserId(userId)
@@ -71,16 +89,19 @@ public class UserAvatarService {
                         .orElse(null));
     }
 
+    /** 查询目标相关数据；只返回当前调用方有权查看的结果。 */
     public Optional<UserAvatar> find(Long userId) {
         return avatarMapper.findByUserId(userId);
     }
 
+    /** 返回Required。 */
     public UserAvatar getRequired(Long userId) {
         userService.getRequiredActiveById(userId);
         return find(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "用户尚未上传头像"));
     }
 
+    /** 执行 open 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public InputStream open(UserAvatar avatar) {
         try {
             return minioClient.getObject(
@@ -96,6 +117,7 @@ public class UserAvatarService {
     }
 
     @Transactional
+    /** 执行 upload 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public String upload(Long userId, MultipartFile file) {
         userService.getRequiredById(userId);
         ValidatedAvatar validated = validate(file);
@@ -153,6 +175,7 @@ public class UserAvatarService {
     }
 
     @Transactional
+    /** 删除、移除或清理，同时维护关联数据和权限不变量。 */
     public void delete(Long userId) {
         UserAvatar avatar = avatarMapper.findByUserId(userId).orElse(null);
         if (avatar != null) {
@@ -166,6 +189,7 @@ public class UserAvatarService {
         }
     }
 
+    /** 校验及相关业务前置条件，不满足时抛出明确业务异常。 */
     private ValidatedAvatar validate(MultipartFile file) {
         if (file == null || file.isEmpty() || file.getSize() <= 0) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "请选择头像图片");
@@ -196,6 +220,7 @@ public class UserAvatarService {
         return new ValidatedAvatar(originalName.trim(), extension, actualType);
     }
 
+    /** 执行 platformUrl 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private String platformUrl(UserAvatar avatar) {
         int version = avatar.getUpdatedAt() == null ? 0 : avatar.getUpdatedAt().hashCode();
         return "/api/users/%d/avatar?v=%s".formatted(
@@ -204,6 +229,7 @@ public class UserAvatarService {
         );
     }
 
+    /** 删除、移除或清理Quietly，同时维护关联数据和权限不变量。 */
     private void removeQuietly(String bucket, String objectName) {
         try {
             minioClient.removeObject(
@@ -214,6 +240,7 @@ public class UserAvatarService {
         }
     }
 
+    /** 校验d头像及相关业务前置条件，不满足时抛出明确业务异常。 */
     private record ValidatedAvatar(String originalName, String extension, String contentType) {
     }
 }

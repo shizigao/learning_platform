@@ -1,3 +1,7 @@
+/* 文件职责：定义线下教学教学的 MyBatis 查询和写入操作，是业务服务访问数据库的持久化端口。
+ * 所属模块：线下教师申请、审核、检索与推荐；所在分层：MyBatis 持久化层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.offline.mapper;
 
 import com.learningplatform.offline.domain.OfflineStudentPreference;
@@ -20,7 +24,13 @@ import java.util.List;
 import java.util.Optional;
 
 @Mapper
+/**
+ * 定义线下教学教学的 MyBatis 查询和写入操作，是业务服务访问数据库的持久化端口。
+ *
+ * <p>职责边界：只表达数据库读写语义，不在 SQL 映射层做权限和业务决策。</p>
+ */
 public interface OfflineTeachingMapper {
+    /** 定义 APPLICATION_COLUMNS 常量，统一该组件使用的固定规则或默认值。 */
     String APPLICATION_COLUMNS = """
             id, user_id, teacher_name, id_card_ciphertext, id_card_iv,
             id_card_hmac, id_card_masked, gender, education_level,
@@ -31,6 +41,7 @@ public interface OfflineTeachingMapper {
             version, created_at, updated_at
             """;
 
+    /** 定义 PROFILE_COLUMNS 常量，统一该组件使用的固定规则或默认值。 */
     String PROFILE_COLUMNS = """
             p.id, p.user_id, p.source_application_id, p.teacher_name, p.gender,
             p.education_level, p.education_background, p.institution,
@@ -43,10 +54,12 @@ public interface OfflineTeachingMapper {
 
     @Select("SELECT " + APPLICATION_COLUMNS
             + " FROM offline_teacher_application WHERE user_id = #{userId} AND deleted = 0")
+    /** 执行 findApplicationByUserId 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<OfflineTeacherApplication> findApplicationByUserId(Long userId);
 
     @Select("SELECT " + APPLICATION_COLUMNS
             + " FROM offline_teacher_application WHERE id = #{id} AND deleted = 0")
+    /** 执行 findApplicationById 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<OfflineTeacherApplication> findApplicationById(Long id);
 
     @Insert("""
@@ -67,6 +80,7 @@ public interface OfflineTeachingMapper {
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
+    /** 插入新记录，并返回受影响行数；配置生成主键时同时回填实体 ID。 */
     int insertApplication(OfflineTeacherApplication application);
 
     @Update("""
@@ -102,6 +116,7 @@ public interface OfflineTeachingMapper {
             WHERE id = #{id} AND user_id = #{userId}
               AND status <> 'PENDING' AND deleted = 0
             """)
+    /** 执行 updateApplication 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int updateApplication(OfflineTeacherApplication application);
 
     @Update("""
@@ -112,6 +127,7 @@ public interface OfflineTeachingMapper {
             WHERE id = #{id} AND user_id = #{userId} AND status = 'DRAFT'
               AND deleted = 0
             """)
+    /** 执行 submitApplication 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int submitApplication(
             @Param("id") Long id,
             @Param("userId") Long userId,
@@ -125,6 +141,7 @@ public interface OfflineTeachingMapper {
                 version = version + 1
             WHERE id = #{id} AND status = 'PENDING' AND deleted = 0
             """)
+    /** 执行 reviewApplication 对应的数据库操作；写操作返回受影响行数供服务层判断状态。 */
     int reviewApplication(
             @Param("id") Long id,
             @Param("status") TeacherApplicationStatus status,
@@ -174,6 +191,7 @@ public interface OfflineTeachingMapper {
               version = offline_teacher_profile.version + 1,
               deleted = 0
             """)
+    /** 执行 upsertProfileFromApplication 对应的数据库操作；写操作返回受影响行数供服务层判断状态。 */
     int upsertProfileFromApplication(
             @Param("applicationId") Long applicationId,
             @Param("approvedAt") LocalDateTime approvedAt,
@@ -187,6 +205,7 @@ public interface OfflineTeachingMapper {
             INNER JOIN `user` u ON u.id = p.user_id
             WHERE p.id = #{id} AND p.deleted = 0 AND u.deleted = 0
             """)
+    /** 执行 findProfileById 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<OfflineTeacherProfile> findProfileById(Long id);
 
     @Select("""
@@ -196,6 +215,7 @@ public interface OfflineTeachingMapper {
             INNER JOIN `user` u ON u.id = p.user_id
             WHERE p.user_id = #{userId} AND p.deleted = 0 AND u.deleted = 0
             """)
+    /** 执行 findProfileByUserId 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<OfflineTeacherProfile> findProfileByUserId(Long userId);
 
     @Select("""
@@ -223,6 +243,7 @@ public interface OfflineTeachingMapper {
             LIMIT #{limit} OFFSET #{offset}
             </script>
             """)
+    /** 执行 findProfiles 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     List<OfflineTeacherProfile> findProfiles(
             @Param("keyword") String keyword,
             @Param("province") String province,
@@ -255,6 +276,7 @@ public interface OfflineTeachingMapper {
             <if test='maxHourlyRate != null'>AND p.hourly_rate &lt;= #{maxHourlyRate}</if>
             </script>
             """)
+    /** 执行 countProfiles 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     long countProfiles(
             @Param("keyword") String keyword,
             @Param("province") String province,
@@ -277,6 +299,7 @@ public interface OfflineTeachingMapper {
               p.updated_at DESC
             LIMIT 100
             """)
+    /** 执行 findRecommendationCandidates 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     List<OfflineTeacherProfile> findRecommendationCandidates(
             @Param("province") String province,
             @Param("city") String city,
@@ -288,6 +311,7 @@ public interface OfflineTeachingMapper {
             SET status = #{status}, suspended_reason = #{reason}, version = version + 1
             WHERE id = #{id} AND deleted = 0
             """)
+    /** 执行 updateProfileStatus 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int updateProfileStatus(
             @Param("id") Long id,
             @Param("status") TeacherProfileStatus status,
@@ -319,6 +343,7 @@ public interface OfflineTeachingMapper {
             LIMIT #{limit} OFFSET #{offset}
             </script>
             """)
+    /** 执行 findApplicationsForAdmin 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     List<TeacherApplicationAdminView> findApplicationsForAdmin(
             @Param("status") TeacherApplicationStatus status,
             @Param("keyword") String keyword,
@@ -341,6 +366,7 @@ public interface OfflineTeachingMapper {
             </if>
             </script>
             """)
+    /** 执行 countApplicationsForAdmin 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     long countApplicationsForAdmin(
             @Param("status") TeacherApplicationStatus status,
             @Param("keyword") String keyword
@@ -365,6 +391,7 @@ public interface OfflineTeachingMapper {
               teacher_preferences = VALUES(teacher_preferences),
               additional_notes = VALUES(additional_notes)
             """)
+    /** 执行 upsertPreference 对应的数据库操作；写操作返回受影响行数供服务层判断状态。 */
     int upsertPreference(OfflineStudentPreference preference);
 
     @Select("""
@@ -373,6 +400,7 @@ public interface OfflineTeachingMapper {
               teacher_preferences, additional_notes, created_at, updated_at
             FROM offline_student_preference WHERE user_id = #{userId}
             """)
+    /** 执行 findPreference 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<OfflineStudentPreference> findPreference(Long userId);
 
     @Insert("""
@@ -385,6 +413,7 @@ public interface OfflineTeachingMapper {
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
+    /** 插入新记录，并返回受影响行数；配置生成主键时同时回填实体 ID。 */
     int insertRecommendation(OfflineTeacherRecommendation recommendation);
 
     @Select("""
@@ -393,5 +422,6 @@ public interface OfflineTeachingMapper {
             FROM offline_teacher_recommendation
             WHERE task_id = #{taskId}
             """)
+    /** 执行 findRecommendationByTaskId 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<OfflineTeacherRecommendation> findRecommendationByTaskId(Long taskId);
 }

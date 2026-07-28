@@ -30,6 +30,7 @@ export async function generateSummary(
   requestId: string,
 ): Promise<AiSummary> {
   return data(
+    // 发起请求
     await http.post<ApiResponse<AiSummary>>(
       `/ai/contents/${contentId}/summaries`,
       { requestId },

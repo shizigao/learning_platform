@@ -1,3 +1,7 @@
+/* 文件职责：实现权益业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：商品、订单、支付模拟与用户权益；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.order.service;
 
 import com.learningplatform.common.api.ErrorCode;
@@ -30,10 +34,14 @@ import java.util.List;
  */
 @Service
 public class EntitlementService {
+    /** 访问权益持久化数据。 */
     private final UserEntitlementMapper entitlementMapper;
+    /** 访问订单持久化数据。 */
     private final OrderMapper orderMapper;
+    /** 访问item持久化数据。 */
     private final OrderItemMapper itemMapper;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public EntitlementService(
             UserEntitlementMapper entitlementMapper,
             OrderMapper orderMapper,
@@ -177,6 +185,7 @@ public class EntitlementService {
                 .toList();
     }
 
+    /** 创建或初始化Item，并维护唯一性、初始状态和必要关联。 */
     private EntitlementResponse grantItem(Order order, OrderItem item) {
         UserEntitlement expected = entitlementFor(order, item);
         return entitlementMapper.findBySourceOrderItemId(item.getId())
@@ -187,6 +196,7 @@ public class EntitlementService {
                 .orElseGet(() -> create(expected));
     }
 
+    /** 执行 entitlementFor 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private UserEntitlement entitlementFor(Order order, OrderItem item) {
         UserEntitlement entitlement = new UserEntitlement();
         entitlement.setUserId(order.getUserId());
@@ -212,6 +222,7 @@ public class EntitlementService {
         return entitlement;
     }
 
+    /** 执行 entitlementQuantity 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private int entitlementQuantity(OrderItem item) {
         if (item.getEntitlementQuantity() == null
                 || item.getEntitlementQuantity() <= 0
@@ -229,6 +240,7 @@ public class EntitlementService {
         }
     }
 
+    /** 校验Same权益及相关业务前置条件，不满足时抛出明确业务异常。 */
     private void assertSameEntitlement(
             UserEntitlement existing,
             UserEntitlement expected
@@ -250,6 +262,7 @@ public class EntitlementService {
         }
     }
 
+    /** 转换或规范化AndValidate数据，不引入额外持久化副作用。 */
     private void normalizeAndValidate(UserEntitlement entitlement) {
         if (entitlement.getUserId() == null || entitlement.getUserId() <= 0) {
             throw invalid("权益用户无效");
@@ -290,6 +303,7 @@ public class EntitlementService {
         }
     }
 
+    /** 校验额度类型及相关业务前置条件，不满足时抛出明确业务异常。 */
     private void requireQuotaType(EntitlementType entitlementType) {
         if (entitlementType != EntitlementType.AI_QUOTA
                 && entitlementType != EntitlementType.EXAM_QUOTA
@@ -299,6 +313,7 @@ public class EntitlementService {
         }
     }
 
+    /** 执行 entitlementType 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private EntitlementType entitlementType(ProductType productType) {
         return switch (productType) {
             case AI_PACKAGE -> EntitlementType.AI_QUOTA;
@@ -309,12 +324,14 @@ public class EntitlementService {
         };
     }
 
+    /** 校验PositiveQuantity及相关业务前置条件，不满足时抛出明确业务异常。 */
     private void requirePositiveQuantity(int quantity) {
         if (quantity <= 0) {
             throw invalid("权益操作数量必须大于0");
         }
     }
 
+    /** 执行 invalid 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private BusinessException invalid(String message) {
         return new BusinessException(ErrorCode.BAD_REQUEST, message);
     }

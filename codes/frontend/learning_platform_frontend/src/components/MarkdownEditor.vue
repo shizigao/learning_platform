@@ -76,6 +76,7 @@ async function insertLink(): Promise<void> {
   }
 }
 
+
 function insertImage(file: ContentFile): void {
   if (file.fileRole !== 'INLINE_IMAGE') {
     ElMessage.warning('只有“正文图片”用途的文件可以作为图片插入')

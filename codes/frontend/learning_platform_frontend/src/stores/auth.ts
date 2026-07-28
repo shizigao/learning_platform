@@ -87,6 +87,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function login(payload: LoginPayload): Promise<UserProfile> {
     loading.value = true
     try {
+      // 向后端发送登录请求，点击loginRequest
       const result = await loginRequest(payload)
       setAuthSession(result.accessToken, result.expiresIn)
       user.value = result.user

@@ -1,3 +1,7 @@
+/* 文件职责：在 Servlet 过滤链中处理操作审核过滤器，并在请求进入 Controller 前建立安全或上下文约束。
+ * 所属模块：平台治理与管理员操作；所在分层：审计基础设施层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.admin.audit;
 
 import com.learningplatform.auth.security.AuthenticatedUserPrincipal;
@@ -24,13 +28,22 @@ import java.util.regex.Pattern;
 
 @Component
 @Order(Ordered.LOWEST_PRECEDENCE - 100)
+/**
+ * 在 Servlet 过滤链中处理操作审核过滤器，并在请求进入 Controller 前建立安全或上下文约束。
+ *
+ * <p>职责边界：遵守 平台治理与管理员操作 模块的职责边界。</p>
+ */
 public class OperationAuditFilter extends OncePerRequestFilter {
+    /** 定义 LOGIN_OPERATOR_ID 常量，统一该组件使用的固定规则或默认值。 */
     public static final String LOGIN_OPERATOR_ID =
             OperationAuditFilter.class.getName() + ".loginOperatorId";
+    /** 定义 LOGIN_OPERATOR_NAME 常量，统一该组件使用的固定规则或默认值。 */
     public static final String LOGIN_OPERATOR_NAME =
             OperationAuditFilter.class.getName() + ".loginOperatorName";
+    /** 记录关键状态变化和异常上下文，不输出密码、密钥或敏感正文。 */
     private static final Logger LOGGER =
             LoggerFactory.getLogger(OperationAuditFilter.class);
+    /** 定义 MAX_DURATION_MS 常量，统一该组件使用的固定规则或默认值。 */
     private static final int MAX_DURATION_MS = Integer.MAX_VALUE;
     private static final List<AuditRule> RULES = List.of(
             rule("POST", "^/api/auth/login$", "AUTH", "LOGIN", "USER"),
@@ -63,18 +76,22 @@ public class OperationAuditFilter extends OncePerRequestFilter {
                     "GRADING", "COMPLETE_REVIEW", "EXAM_ATTEMPT")
     );
 
+    /** 委托操作日志执行对应领域规则。 */
     private final OperationLogService operationLogService;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public OperationAuditFilter(OperationLogService operationLogService) {
         this.operationLogService = operationLogService;
     }
 
     @Override
+    /** 执行 shouldNotFilter 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     protected boolean shouldNotFilter(HttpServletRequest request) {
         return findRule(request).match() == null;
     }
 
     @Override
+    /** 执行 doFilterInternal 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
@@ -93,6 +110,7 @@ public class OperationAuditFilter extends OncePerRequestFilter {
         }
     }
 
+    /** 执行 recordSafely 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private void recordSafely(
             HttpServletRequest request,
             HttpServletResponse response,
@@ -130,6 +148,7 @@ public class OperationAuditFilter extends OncePerRequestFilter {
         }
     }
 
+    /** 执行 applyOperator 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private void applyOperator(OperationLog log, HttpServletRequest request) {
         Authentication authentication =
                 SecurityContextHolder.getContext().getAuthentication();
@@ -150,6 +169,7 @@ public class OperationAuditFilter extends OncePerRequestFilter {
         }
     }
 
+    /** 查询Rule相关数据；只返回当前调用方有权查看的结果。 */
     private RuleMatch findRule(HttpServletRequest request) {
         String path = path(request);
         for (AuditRule rule : RULES) {
@@ -164,6 +184,7 @@ public class OperationAuditFilter extends OncePerRequestFilter {
         return new RuleMatch(null, null);
     }
 
+    /** 执行 targetId 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private String targetId(Matcher matcher, HttpServletRequest request) {
         if ("/api/auth/login".equals(path(request))) {
             Object operatorId = request.getAttribute(LOGIN_OPERATOR_ID);
@@ -176,22 +197,26 @@ public class OperationAuditFilter extends OncePerRequestFilter {
         }
     }
 
+    /** 执行 requestId 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private String requestId(HttpServletResponse response) {
         String value = MDC.get("traceId");
         return value == null ? response.getHeader(TraceIdFilter.HEADER_NAME) : value;
     }
 
+    /** 执行 path 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private String path(HttpServletRequest request) {
         String uri = request.getRequestURI();
         String context = request.getContextPath();
         return context.isEmpty() ? uri : uri.substring(context.length());
     }
 
+    /** 执行 durationMillis 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private int durationMillis(long startedAt) {
         long elapsed = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
         return (int) Math.min(Math.max(elapsed, 0), MAX_DURATION_MS);
     }
 
+    /** 执行 limit 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private String limit(String value, int maxLength) {
         if (value == null || value.isBlank()) {
             return null;
@@ -202,6 +227,7 @@ public class OperationAuditFilter extends OncePerRequestFilter {
                 : normalized.substring(0, maxLength);
     }
 
+    /** 执行 rule 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private static AuditRule rule(
             String method,
             String regex,
@@ -218,6 +244,7 @@ public class OperationAuditFilter extends OncePerRequestFilter {
         );
     }
 
+    /** 执行 AuditRule 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private record AuditRule(
             String method,
             Pattern pathPattern,
@@ -227,6 +254,7 @@ public class OperationAuditFilter extends OncePerRequestFilter {
     ) {
     }
 
+    /** 执行 RuleMatch 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private record RuleMatch(AuditRule rule, Matcher match) {
     }
 }

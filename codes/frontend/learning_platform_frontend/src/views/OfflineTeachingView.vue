@@ -291,10 +291,12 @@ function requestId(): string {
   return `teacher-${suffix}`.slice(0, 64)
 }
 
+// AI生成推荐
 async function generateRecommendation(): Promise<void> {
   if (!validPreference()) return
   recommendationLoading.value = true
   try {
+    //等待后端返回推荐教师的列表，点击recommendTeachers
     recommendation.value = await recommendTeachers(requestId(), {
       ...preference,
       subject: preference.subject.trim(),

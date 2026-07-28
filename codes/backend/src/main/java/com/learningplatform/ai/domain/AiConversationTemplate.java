@@ -1,5 +1,14 @@
+/* 文件职责：枚举AI会话模板允许的有限取值，供持久化、校验和状态分支共同使用。
+ * 所属模块：AI 任务、对话、分析与供应商调用；所在分层：领域模型层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.ai.domain;
 
+/**
+ * 枚举AI会话模板允许的有限取值，供持久化、校验和状态分支共同使用。
+ *
+ * <p>职责边界：保存领域状态，不依赖 Web 层，也不负责发起外部调用。</p>
+ */
 public enum AiConversationTemplate {
     QUIZ_REINFORCEMENT(
             "出题巩固",
@@ -28,7 +37,9 @@ public enum AiConversationTemplate {
             """
     );
 
+    /** 保存displayText，供该类型的业务逻辑读取或更新。 */
     private final String displayText;
+    /** 保存提示词，供该类型的业务逻辑读取或更新。 */
     private final String prompt;
 
     AiConversationTemplate(String displayText, String prompt) {
@@ -36,10 +47,12 @@ public enum AiConversationTemplate {
         this.prompt = prompt;
     }
 
+    /** 返回DisplayText。 */
     public String getDisplayText() {
         return displayText;
     }
 
+    /** 返回提示词。 */
     public String getPrompt() {
         return prompt;
     }

@@ -36,6 +36,7 @@ async function submit(): Promise<void> {
   if (!formRef.value || !(await formRef.value.validate())) return
 
   try {
+    // 发送登录请求，点击login
     await authStore.login({
       username: form.username.trim(),
       password: form.password,
@@ -72,6 +73,7 @@ onMounted(() => {
       show-icon
     />
 
+    <!-- 发送登录请求，点击submit -->
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent="submit">
       <el-form-item label="用户名" prop="username">
         <el-input

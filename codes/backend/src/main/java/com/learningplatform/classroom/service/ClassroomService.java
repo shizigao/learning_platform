@@ -1,3 +1,7 @@
+/* 文件职责：实现班级业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ * 所属模块：班级、成员、公告与班级资源范围；所在分层：业务服务层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.classroom.service;
 
 import com.learningplatform.classroom.domain.ClassMember;
@@ -29,16 +33,27 @@ import java.util.Locale;
 import java.util.Set;
 
 @Service
+/**
+ * 实现班级业务规则，协调持久化组件并维护事务、权限、状态与幂等边界。
+ *
+ * <p>职责边界：业务状态变化在此集中完成；跨表写入需保持事务一致性。</p>
+ */
 public class ClassroomService {
     private static final char[] INVITE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ".toCharArray();
+    /** 定义 INVITE_LENGTH 常量，统一该组件使用的固定规则或默认值。 */
     private static final int INVITE_LENGTH = 12;
 
+    /** 保存mapper，供该类型的业务逻辑读取或更新。 */
     private final ClassroomMapper mapper;
+    /** 委托用户执行对应领域规则。 */
     private final UserService userService;
+    /** 委托角色执行对应领域规则。 */
     private final RoleService roleService;
+    /** 委托头像执行对应领域规则。 */
     private final UserAvatarService avatarService;
     private final SecureRandom secureRandom = new SecureRandom();
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public ClassroomService(
             ClassroomMapper mapper,
             UserService userService,
@@ -51,18 +66,21 @@ public class ClassroomService {
         this.avatarService = avatarService;
     }
 
+    /** 创建或初始化edClasses，并维护唯一性、初始状态和必要关联。 */
     public List<ClassSummaryResponse> joinedClasses(Long userId) {
         return mapper.findJoinedClasses(userId).stream()
                 .map(classroom -> response(classroom, userId))
                 .toList();
     }
 
+    /** 执行 managedClasses 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public List<ClassSummaryResponse> managedClasses(Long userId) {
         return mapper.findManagedClasses(userId).stream()
                 .map(classroom -> response(classroom, userId))
                 .toList();
     }
 
+    /** 查询目标相关数据；只返回当前调用方有权查看的结果。 */
     public ClassSummaryResponse detail(Long classId, Long userId) {
         LearningClass classroom = getRequired(classId);
         requireActiveMember(classId, userId);
@@ -70,6 +88,7 @@ public class ClassroomService {
     }
 
     @Transactional
+    /** 创建或初始化，并维护唯一性、初始状态和必要关联。 */
     public ClassSummaryResponse create(Long ownerId, ClassWriteRequest request) {
         User owner = userService.getRequiredById(ownerId);
         if (owner.getStatus() != UserStatus.ACTIVE) {
@@ -99,6 +118,7 @@ public class ClassroomService {
     }
 
     @Transactional
+    /** 更新，通过返回值或版本条件识别并发状态变化。 */
     public ClassSummaryResponse update(
             Long classId,
             Long requesterId,
@@ -115,6 +135,7 @@ public class ClassroomService {
     }
 
     @Transactional
+    /** 创建或初始化，并维护唯一性、初始状态和必要关联。 */
     public ClassSummaryResponse join(Long userId, String inviteCode) {
         String normalized = normalizeInviteCode(inviteCode);
         LearningClass classroom = mapper.findClassByInviteCode(normalized)
@@ -147,6 +168,7 @@ public class ClassroomService {
     }
 
     @Transactional
+    /** 删除、移除或清理，同时维护关联数据和权限不变量。 */
     public void leave(Long classId, Long userId) {
         ClassMember member = requireActiveMember(classId, userId);
         if (member.getRole() == ClassRole.OWNER) {
@@ -157,6 +179,7 @@ public class ClassroomService {
         }
     }
 
+    /** 执行 members 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public PageResult<ClassMemberResponse> members(
             Long classId,
             Long requesterId,
@@ -180,6 +203,7 @@ public class ClassroomService {
     }
 
     @Transactional
+    /** 更新邀请码，通过返回值或版本条件识别并发状态变化。 */
     public ClassSummaryResponse regenerateInvite(Long classId, Long requesterId) {
         requireOwner(classId, requesterId);
         String inviteCode = generateUniqueInviteCode();
@@ -190,6 +214,7 @@ public class ClassroomService {
     }
 
     @Transactional
+    /** 更新邀请码启用状态；调用方仍需遵守所属领域的校验规则。 */
     public ClassSummaryResponse setInviteEnabled(
             Long classId,
             Long requesterId,
@@ -203,6 +228,7 @@ public class ClassroomService {
     }
 
     @Transactional
+    /** 更新成员角色，通过返回值或版本条件识别并发状态变化。 */
     public void updateMemberRole(
             Long classId,
             Long requesterId,
@@ -226,6 +252,7 @@ public class ClassroomService {
     }
 
     @Transactional
+    /** 删除、移除或清理成员，同时维护关联数据和权限不变量。 */
     public void removeMember(Long classId, Long requesterId, Long targetUserId) {
         ClassMember requester = requireManager(classId, requesterId);
         ClassMember target = requireActiveMember(classId, targetUserId);
@@ -241,6 +268,7 @@ public class ClassroomService {
     }
 
     @Transactional
+    /** 更新成员，通过返回值或版本条件识别并发状态变化。 */
     public void restoreMember(Long classId, Long requesterId, Long targetUserId) {
         requireOwner(classId, requesterId);
         if (mapper.restoreMember(classId, targetUserId) != 1) {
@@ -249,6 +277,7 @@ public class ClassroomService {
     }
 
     @Transactional
+    /** 执行 transferOwnership 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public ClassSummaryResponse transferOwnership(
             Long classId,
             Long requesterId,
@@ -271,6 +300,7 @@ public class ClassroomService {
     }
 
     @Transactional
+    /** 执行 archive 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public void archive(Long classId, Long requesterId) {
         requireOwner(classId, requesterId);
         if (mapper.countActiveClassExams(classId) > 0) {
@@ -281,6 +311,7 @@ public class ClassroomService {
         }
     }
 
+    /** 返回Required。 */
     public LearningClass getRequired(Long classId) {
         LearningClass classroom = mapper.findClassById(classId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "班级不存在"));
@@ -290,6 +321,7 @@ public class ClassroomService {
         return classroom;
     }
 
+    /** 校验Active成员及相关业务前置条件，不满足时抛出明确业务异常。 */
     public ClassMember requireActiveMember(Long classId, Long userId) {
         getRequired(classId);
         ClassMember member = mapper.findMember(classId, userId)
@@ -300,6 +332,7 @@ public class ClassroomService {
         return member;
     }
 
+    /** 校验Manager及相关业务前置条件，不满足时抛出明确业务异常。 */
     public ClassMember requireManager(Long classId, Long userId) {
         ClassMember member = requireActiveMember(classId, userId);
         if (member.getRole() != ClassRole.OWNER && member.getRole() != ClassRole.ADMIN) {
@@ -308,6 +341,7 @@ public class ClassroomService {
         return member;
     }
 
+    /** 校验Owner及相关业务前置条件，不满足时抛出明确业务异常。 */
     public ClassMember requireOwner(Long classId, Long userId) {
         ClassMember member = requireActiveMember(classId, userId);
         if (member.getRole() != ClassRole.OWNER) {
@@ -316,6 +350,7 @@ public class ClassroomService {
         return member;
     }
 
+    /** 判断是否满足Active成员条件，不修改持久化状态。 */
     public boolean isActiveMember(Long classId, Long userId) {
         if (userId == null) return false;
         return mapper.findMember(classId, userId)
@@ -323,6 +358,7 @@ public class ClassroomService {
                 .isPresent();
     }
 
+    /** 校验ManageableClasses及相关业务前置条件，不满足时抛出明确业务异常。 */
     public void requireManageableClasses(List<Long> classIds, Long userId) {
         if (classIds == null || classIds.isEmpty()) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "班级发放至少需要选择一个班级");
@@ -333,6 +369,7 @@ public class ClassroomService {
         classIds.forEach(classId -> requireManager(classId, userId));
     }
 
+    /** 执行 response 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private ClassSummaryResponse response(LearningClass classroom, Long userId) {
         ClassMember member = mapper.findMember(classroom.getId(), userId).orElse(null);
         ClassRole role = member != null && member.getStatus() == ClassMemberStatus.ACTIVE
@@ -354,11 +391,13 @@ public class ClassroomService {
         );
     }
 
+    /** 判断是否满足PublisherOr管理角色条件，不修改持久化状态。 */
     private boolean hasPublisherOrAdminRole(Long userId) {
         Set<RoleCode> roles = roleService.findRoleCodesByUserId(userId);
         return roles.contains(RoleCode.PUBLISHER) || roles.contains(RoleCode.ADMIN);
     }
 
+    /** 执行生成Unique邀请码编码核心计算或业务处理，并保证失败不会留下不一致的持久化结果。 */
     private String generateUniqueInviteCode() {
         for (int attempt = 0; attempt < 20; attempt++) {
             StringBuilder code = new StringBuilder(INVITE_LENGTH);
@@ -370,10 +409,12 @@ public class ClassroomService {
         throw new BusinessException(ErrorCode.INTERNAL_ERROR, "生成班级邀请码失败");
     }
 
+    /** 转换或规范化邀请码编码数据，不引入额外持久化副作用。 */
     private String normalizeInviteCode(String inviteCode) {
         return inviteCode == null ? "" : inviteCode.trim().toUpperCase(Locale.ROOT);
     }
 
+    /** 转换或规范化数据，不引入额外持久化副作用。 */
     private String normalize(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }

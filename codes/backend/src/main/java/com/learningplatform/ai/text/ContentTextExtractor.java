@@ -1,3 +1,7 @@
+/* 文件职责：从输入中提取并规范化学习资料Text提取器，为后续业务或 AI 调用提供安全文本。
+ * 所属模块：AI 任务、对话、分析与供应商调用；所在分层：文本提取与规范化层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.ai.text;
 
 import com.learningplatform.common.api.ErrorCode;
@@ -26,17 +30,29 @@ import java.util.Locale;
 import java.util.Set;
 
 @Service
+/**
+ * 从输入中提取并规范化学习资料Text提取器，为后续业务或 AI 调用提供安全文本。
+ *
+ * <p>职责边界：遵守 AI 任务、对话、分析与供应商调用 模块的职责边界。</p>
+ */
 public class ContentTextExtractor {
+    /** 定义 MAX_TEXT_FILE_BYTES 常量，统一该组件使用的固定规则或默认值。 */
     private static final int MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024;
     private static final Set<String> TEXT_EXTENSIONS = Set.of("txt", "md");
+    /** 定义 TEXT_FILE_ROLES 常量，统一该组件使用的固定规则或默认值。 */
     private static final Set<ContentFileRole> TEXT_FILE_ROLES =
             Set.of(ContentFileRole.CONTENT, ContentFileRole.ATTACHMENT);
 
+    /** 委托访问权执行对应领域规则。 */
     private final ContentAccessService accessService;
+    /** 访问文件持久化数据。 */
     private final ContentFileMapper fileMapper;
+    /** 委托存储执行对应领域规则。 */
     private final MinioStorageService storageService;
+    /** 保存最大输入Chars，供该类型的业务逻辑读取或更新。 */
     private final int maxInputChars;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public ContentTextExtractor(
             ContentAccessService accessService,
             ContentFileMapper fileMapper,
@@ -54,11 +70,13 @@ public class ContentTextExtractor {
         this.maxInputChars = aiProperties.limits().maxInputChars();
     }
 
+    /** 执行 extract 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     public ExtractedContentText extract(
             Long contentId,
             Long userId,
             boolean requesterAdmin
     ) {
+        // 检查该该用户是否有获取该资料的资格，如果有则取出，点击requireAccess
         LearningContent content = accessService.requireAccess(
                 contentId,
                 userId,
@@ -98,6 +116,7 @@ public class ContentTextExtractor {
         );
     }
 
+    /** 执行 supports 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private boolean supports(ContentFile file) {
         if (file.getFileRole() == null
                 || !TEXT_FILE_ROLES.contains(file.getFileRole())
@@ -112,6 +131,7 @@ public class ContentTextExtractor {
         );
     }
 
+    /** 查询Utf8相关数据；只返回当前调用方有权查看的结果。 */
     private String readUtf8(ContentFile file) {
         try (InputStream input = storageService.downloadAuthorized(file.getObjectName())) {
             byte[] bytes = input.readNBytes(MAX_TEXT_FILE_BYTES + 1);
@@ -133,6 +153,7 @@ public class ContentTextExtractor {
         }
     }
 
+    /** 执行 appendSection 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private void appendSection(StringBuilder target, String heading, String value) {
         if (value == null || value.isBlank()) {
             return;
@@ -155,6 +176,7 @@ public class ContentTextExtractor {
         target.append("## ").append(heading).append('\n').append(value.trim());
     }
 
+    /** 执行 sha256 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private String sha256(String value) {
         try {
             return HexFormat.of().formatHex(

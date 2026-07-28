@@ -1,3 +1,7 @@
+/* 文件职责：定义考试作答的 MyBatis 查询和写入操作，是业务服务访问数据库的持久化端口。
+ * 所属模块：试卷、考试、作答、阅卷、统计与错题；所在分层：MyBatis 持久化层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.exam.mapper;
 
 import com.learningplatform.exam.domain.ExamAttempt;
@@ -13,7 +17,13 @@ import java.util.List;
 import java.util.Optional;
 
 @Mapper
+/**
+ * 定义考试作答的 MyBatis 查询和写入操作，是业务服务访问数据库的持久化端口。
+ *
+ * <p>职责边界：只表达数据库读写语义，不在 SQL 映射层做权限和业务决策。</p>
+ */
 public interface ExamAttemptMapper {
+    /** 复用学习资料查询列，保证不同查询返回一致字段集合。 */
     String COLUMNS = """
             id, exam_id, candidate_id, user_id, attempt_no, status,
             started_at, deadline_at, last_saved_at, submitted_at, submission_type,
@@ -27,6 +37,7 @@ public interface ExamAttemptMapper {
             FROM exam_attempt
             WHERE exam_id = #{examId} AND user_id = #{userId} AND attempt_no = 1
             """)
+    /** 执行 findFirst 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<ExamAttempt> findFirst(
             @Param("examId") Long examId,
             @Param("userId") Long userId
@@ -39,6 +50,7 @@ public interface ExamAttemptMapper {
             WHERE exam_id = #{examId} AND user_id = #{userId} AND attempt_no = 1
             FOR UPDATE
             """)
+    /** 执行 findFirstForUpdate 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<ExamAttempt> findFirstForUpdate(
             @Param("examId") Long examId,
             @Param("userId") Long userId
@@ -51,6 +63,7 @@ public interface ExamAttemptMapper {
             WHERE id = #{attemptId}
             FOR UPDATE
             """)
+    /** 执行 findByIdForUpdate 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<ExamAttempt> findByIdForUpdate(Long attemptId);
 
     @Select("""
@@ -59,6 +72,7 @@ public interface ExamAttemptMapper {
             FROM exam_attempt
             WHERE id = #{attemptId}
             """)
+    /** 执行 findById 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     Optional<ExamAttempt> findById(Long attemptId);
 
     @Insert("""
@@ -71,6 +85,7 @@ public interface ExamAttemptMapper {
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
+    /** 插入新记录，并返回受影响行数；配置生成主键时同时回填实体 ID。 */
     int insert(ExamAttempt attempt);
 
     @Update("""
@@ -78,6 +93,7 @@ public interface ExamAttemptMapper {
             SET last_saved_at = #{savedAt}
             WHERE id = #{attemptId} AND status = 'IN_PROGRESS'
             """)
+    /** 转换或规范化uchSaved时间数据，不引入额外持久化副作用。 */
     int touchSavedAt(
             @Param("attemptId") Long attemptId,
             @Param("savedAt") LocalDateTime savedAt
@@ -91,6 +107,7 @@ public interface ExamAttemptMapper {
                 version = version + 1
             WHERE id = #{attemptId} AND status = 'IN_PROGRESS'
             """)
+    /** 执行 markSubmitted 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int markSubmitted(
             @Param("attemptId") Long attemptId,
             @Param("submittedAt") LocalDateTime submittedAt,
@@ -107,6 +124,7 @@ public interface ExamAttemptMapper {
             WHERE id = #{attemptId}
               AND status IN ('SUBMITTED', 'GRADING', 'COMPLETED')
             """)
+    /** 执行 updateGradingState 条件写入并返回受影响行数，服务层据此识别状态冲突或并发修改。 */
     int updateGradingState(
             @Param("attemptId") Long attemptId,
             @Param("status") com.learningplatform.exam.domain.ExamAttemptStatus status,
@@ -132,6 +150,7 @@ public interface ExamAttemptMapper {
               AND a.status IN ('SUBMITTED', 'GRADING', 'COMPLETED')
             ORDER BY a.submitted_at DESC, a.id DESC
             """)
+    /** 执行 findSubmittedByExam 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     List<ExamAttempt> findSubmittedByExam(Long examId);
 
     @Select("""
@@ -141,6 +160,7 @@ public interface ExamAttemptMapper {
             ORDER BY deadline_at ASC, id ASC
             LIMIT #{limit}
             """)
+    /** 执行 findExpiredIds 数据库查询，返回领域对象、聚合值或是否存在的判断结果。 */
     List<Long> findExpiredIds(
             @Param("now") LocalDateTime now,
             @Param("limit") int limit

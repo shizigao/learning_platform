@@ -1,3 +1,7 @@
+/* 文件职责：提供用户资料相关 HTTP 接口，负责请求校验、身份解析、权限入口和统一响应封装。
+ * 所属模块：用户、角色、头像与公开个人中心；所在分层：HTTP 接口层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.user.web;
 
 import com.learningplatform.auth.dto.UserProfileResponse;
@@ -35,11 +39,20 @@ import org.springframework.web.multipart.MultipartFile;
 @Validated
 @RestController
 @RequestMapping("/api/users")
+/**
+ * 提供用户资料相关 HTTP 接口，负责请求校验、身份解析、权限入口和统一响应封装。
+ *
+ * <p>职责边界：只处理 HTTP 协议和身份入口，不直接编写 SQL 或复制领域规则。</p>
+ */
 public class UserProfileController {
+    /** 委托资料执行对应领域规则。 */
     private final PublicUserProfileService profileService;
+    /** 委托头像执行对应领域规则。 */
     private final UserAvatarService avatarService;
+    /** 委托认证执行对应领域规则。 */
     private final AuthService authService;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public UserProfileController(
             PublicUserProfileService profileService,
             UserAvatarService avatarService,
@@ -51,6 +64,7 @@ public class UserProfileController {
     }
 
     @GetMapping("/search")
+    /** 处理 GET /search 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<PageResult<PublicUserSummaryResponse>> search(
             @Valid @ModelAttribute UserSearchQuery query
     ) {
@@ -58,11 +72,13 @@ public class UserProfileController {
     }
 
     @GetMapping("/{userId}")
+    /** 处理 GET /{userId} 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<PublicUserProfileResponse> profile(@PathVariable Long userId) {
         return ApiResponse.success(profileService.profile(userId));
     }
 
     @GetMapping("/{userId}/contents")
+    /** 处理 GET /{userId}/contents 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<PageResult<ContentSummaryResponse>> contents(
             @PathVariable Long userId,
             @Valid @ModelAttribute PageQuery query
@@ -71,6 +87,7 @@ public class UserProfileController {
     }
 
     @PostMapping(path = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    /** 处理 POST 当前资源 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<AvatarUploadResponse> uploadAvatar(
             Authentication authentication,
             @RequestParam("file") MultipartFile file
@@ -82,12 +99,14 @@ public class UserProfileController {
     }
 
     @DeleteMapping("/me/avatar")
+    /** 处理 DELETE /me/avatar 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<UserProfileResponse> deleteAvatar(Authentication authentication) {
         avatarService.delete(userId(authentication));
         return ApiResponse.success(authService.currentUser(authentication));
     }
 
     @GetMapping("/{userId}/avatar")
+    /** 处理 GET /{userId}/avatar 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ResponseEntity<InputStreamResource> avatar(@PathVariable Long userId) {
         UserAvatar avatar = avatarService.getRequired(userId);
         return ResponseEntity.ok()
@@ -97,6 +116,7 @@ public class UserProfileController {
                 .body(new InputStreamResource(avatarService.open(avatar)));
     }
 
+    /** 处理 GET /{userId}/avatar 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     private Long userId(Authentication authentication) {
         AuthenticatedUserPrincipal principal =
                 AuthenticationPrincipalResolver.require(authentication);

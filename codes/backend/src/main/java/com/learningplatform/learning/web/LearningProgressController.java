@@ -1,3 +1,7 @@
+/* 文件职责：提供学习进度相关 HTTP 接口，负责请求校验、身份解析、权限入口和统一响应封装。
+ * 所属模块：学习进度、点赞、收藏与评论；所在分层：HTTP 接口层。
+ * 维护提示：修改本文件时应同步检查相关 DTO、Mapper、Service、Controller 与测试。
+ */
 package com.learningplatform.learning.web;
 
 import com.learningplatform.auth.security.AuthenticatedUserPrincipal;
@@ -23,10 +27,18 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/learning")
+/**
+ * 提供学习进度相关 HTTP 接口，负责请求校验、身份解析、权限入口和统一响应封装。
+ *
+ * <p>职责边界：只处理 HTTP 协议和身份入口，不直接编写 SQL 或复制领域规则。</p>
+ */
 public class LearningProgressController {
+    /** 委托进度执行对应领域规则。 */
     private final LearningProgressService progressService;
+    /** 委托interaction执行对应领域规则。 */
     private final ContentInteractionService interactionService;
 
+    /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public LearningProgressController(
             LearningProgressService progressService,
             ContentInteractionService interactionService
@@ -36,6 +48,7 @@ public class LearningProgressController {
     }
 
     @PostMapping("/contents/{contentId}/start")
+    /** 处理 POST /contents/{contentId}/start 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<LearningProgressResponse> start(
             Authentication authentication,
             @PathVariable Long contentId
@@ -49,6 +62,7 @@ public class LearningProgressController {
     }
 
     @PutMapping("/contents/{contentId}/progress")
+    /** 处理 PUT /contents/{contentId}/progress 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<LearningProgressResponse> update(
             Authentication authentication,
             @PathVariable Long contentId,
@@ -64,6 +78,7 @@ public class LearningProgressController {
     }
 
     @GetMapping("/contents/{contentId}/progress")
+    /** 处理 GET /contents/{contentId}/progress 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<LearningProgressResponse> get(
             Authentication authentication,
             @PathVariable Long contentId
@@ -72,19 +87,23 @@ public class LearningProgressController {
     }
 
     @GetMapping("/progress")
+    /** 处理 GET /progress 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<List<LearningProgressResponse>> list(Authentication authentication) {
         return ApiResponse.success(progressService.list(principal(authentication).userId()));
     }
 
     @GetMapping("/favorites")
+    /** 处理 GET /favorites 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     public ApiResponse<List<ContentSummaryResponse>> favorites(Authentication authentication) {
         return ApiResponse.success(interactionService.favorites(principal(authentication).userId()));
     }
 
+    /** 处理 GET /favorites 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     private AuthenticatedUserPrincipal principal(Authentication authentication) {
         return AuthenticationPrincipalResolver.require(authentication);
     }
 
+    /** 处理 GET /favorites 请求，完成参数接收、当前用户解析并返回统一 API 响应。 */
     private boolean isAdmin(AuthenticatedUserPrincipal principal) {
         return principal.roles().contains(RoleCode.ADMIN);
     }

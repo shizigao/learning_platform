@@ -249,6 +249,7 @@ async function loadContentAiData(): Promise<void> {
   }
 }
 
+// 生成总结函数
 async function runSummary(): Promise<void> {
   if (!selectedContentId.value) return
   if (!hasQuota.value) {
@@ -262,6 +263,7 @@ async function runSummary(): Promise<void> {
   summaryLoading.value = true
   const stopProgress = beginOperation(summaryStatus, '生成总结')
   try {
+    // 等待后端返回总结内容,点击generateSummary
     summary.value = await generateSummary(
       selectedContentId.value,
       createAiRequestId('summary'),
