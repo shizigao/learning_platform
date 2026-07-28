@@ -29,28 +29,38 @@ public class PublicUserProfileService {
     private final UserAvatarService avatarService;
     /** 委托学习资料执行对应领域规则。 */
     private final LearningContentService contentService;
+    private final PublicUserProfileCache profileCache;
 
     /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public PublicUserProfileService(
             UserService userService,
             RoleService roleService,
             UserAvatarService avatarService,
-            LearningContentService contentService
+            LearningContentService contentService,
+            PublicUserProfileCache profileCache
     ) {
         this.userService = userService;
         this.roleService = roleService;
         this.avatarService = avatarService;
         this.contentService = contentService;
+        this.profileCache = profileCache;
     }
 
     /** 执行 profile 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public PublicUserProfileResponse profile(Long userId) {
-        User user = userService.getRequiredActiveById(userId);
-        return PublicUserProfileResponse.from(
-                user,
-                roleService.findRoleCodesByUserId(userId),
-                avatarService.avatarUrl(user),
-                UserPublicationStatsResponse.from(contentService.publicationStats(userId))
+        return profileCache.get(
+                userId,
+                () -> {
+                    User user = userService.getRequiredActiveById(userId);
+                    return PublicUserProfileResponse.from(
+                            user,
+                            roleService.findRoleCodesByUserId(userId),
+                            avatarService.avatarUrl(user),
+                            UserPublicationStatsResponse.from(
+                                    contentService.publicationStats(userId)
+                            )
+                    );
+                }
         );
     }
 

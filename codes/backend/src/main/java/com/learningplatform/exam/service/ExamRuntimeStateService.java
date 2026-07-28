@@ -9,10 +9,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 /**
@@ -22,8 +26,23 @@ import java.time.LocalDateTime;
  */
 public class ExamRuntimeStateService {
     private static final Logger log = LoggerFactory.getLogger(ExamRuntimeStateService.class);
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Shanghai");
     /** 定义 PREFIX 常量，统一该组件使用的固定规则或默认值。 */
     private static final String PREFIX = "exam:attempt:";
+    static final String DEADLINE_INDEX_KEY = "exam:attempt:deadlines";
+    private static final DefaultRedisScript<List> CLAIM_EXPIRED_SCRIPT = new DefaultRedisScript<>(
+            """
+            local attemptIds = redis.call(
+                'ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1],
+                'LIMIT', 0, ARGV[2]
+            )
+            if #attemptIds > 0 then
+                redis.call('ZREM', KEYS[1], unpack(attemptIds))
+            end
+            return attemptIds
+            """,
+            List.class
+    );
 
     /** 保存redis模板，供该类型的业务逻辑读取或更新。 */
     private final StringRedisTemplate redisTemplate;
@@ -49,9 +68,62 @@ public class ExamRuntimeStateService {
             ttl = Duration.ofHours(1);
         }
         try {
+            redisTemplate.opsForZSet().add(
+                    DEADLINE_INDEX_KEY,
+                    attemptId.toString(),
+                    epochMillis(deadlineAt)
+            );
             redisTemplate.opsForValue().set(deadlineKey(attemptId), deadlineAt.toString(), ttl);
         } catch (DataAccessException exception) {
-            log.warn("Redis unavailable while caching exam deadline for attempt {}", attemptId);
+            log.warn("Redis unavailable while indexing exam deadline for attempt {}", attemptId);
+        }
+    }
+
+    /**
+     * Atomically removes and returns due attempts. Removing in the same Lua script prevents
+     * multiple application instances from claiming the same Redis entry.
+     */
+    public ExpiredAttemptClaim claimExpired(LocalDateTime now, int limit) {
+        if (!enabled) {
+            return ExpiredAttemptClaim.redisUnavailable();
+        }
+        try {
+            List<?> rawAttemptIds = redisTemplate.execute(
+                    CLAIM_EXPIRED_SCRIPT,
+                    List.of(DEADLINE_INDEX_KEY),
+                    Long.toString(epochMillis(now)),
+                    Integer.toString(limit)
+            );
+            if (rawAttemptIds == null || rawAttemptIds.isEmpty()) {
+                return ExpiredAttemptClaim.available(List.of());
+            }
+            List<Long> attemptIds = new ArrayList<>(rawAttemptIds.size());
+            for (Object rawAttemptId : rawAttemptIds) {
+                attemptIds.add(Long.valueOf(rawAttemptId.toString()));
+            }
+            return ExpiredAttemptClaim.available(List.copyOf(attemptIds));
+        } catch (DataAccessException exception) {
+            log.warn("Redis unavailable while claiming expired exam attempts");
+            return ExpiredAttemptClaim.redisUnavailable();
+        }
+    }
+
+    /**
+     * Returns a failed claim to the deadline index with a short retry delay.
+     * MySQL remains the source of truth and the periodic database scan is the final fallback.
+     */
+    public void requeueExpired(Long attemptId, LocalDateTime retryAt) {
+        if (!enabled) {
+            return;
+        }
+        try {
+            redisTemplate.opsForZSet().add(
+                    DEADLINE_INDEX_KEY,
+                    attemptId.toString(),
+                    epochMillis(retryAt)
+            );
+        } catch (DataAccessException exception) {
+            log.warn("Redis unavailable while requeueing expired exam attempt {}", attemptId);
         }
     }
 
@@ -77,9 +149,24 @@ public class ExamRuntimeStateService {
             return;
         }
         try {
+            redisTemplate.opsForZSet().remove(DEADLINE_INDEX_KEY, attemptId.toString());
             redisTemplate.delete(java.util.List.of(deadlineKey(attemptId), savedKey(attemptId)));
         } catch (DataAccessException exception) {
             log.warn("Redis unavailable while clearing exam state for attempt {}", attemptId);
+        }
+    }
+
+    private long epochMillis(LocalDateTime value) {
+        return value.atZone(BUSINESS_ZONE).toInstant().toEpochMilli();
+    }
+
+    public record ExpiredAttemptClaim(List<Long> attemptIds, boolean redisAvailable) {
+        private static ExpiredAttemptClaim available(List<Long> attemptIds) {
+            return new ExpiredAttemptClaim(attemptIds, true);
+        }
+
+        private static ExpiredAttemptClaim redisUnavailable() {
+            return new ExpiredAttemptClaim(List.of(), false);
         }
     }
 

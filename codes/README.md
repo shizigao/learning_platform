@@ -57,7 +57,7 @@ codes/
 ├─ 环境配置说明.md
 ├─ 项目部署.md
 ├─ AI功能流程逻辑.md
-├─ redis使用说明.md
+├─ 开发文档/Redis使用说明.md
 └─ 操作流程.md
 ```
 
@@ -339,7 +339,7 @@ npm run dev
 | --- | --- | --- |
 | 应用 | `SERVER_PORT`、`APP_ENV`、`APP_CORS_ALLOWED_ORIGINS` | 端口、环境和允许的前端来源 |
 | MySQL | `DB_URL`、`DB_USERNAME`、`DB_PASSWORD` | 使用专用低权限账号 |
-| Redis | `REDIS_HOST`、`REDIS_PORT`、`REDIS_PASSWORD`、`REDIS_DATABASE` | 登录防刷和考试短期运行态缓存 |
+| Redis | `REDIS_HOST`、`REDIS_PORT`、`REDIS_PASSWORD`、`REDIS_DATABASE` | 分布式限流、认证与热点缓存、浏览量缓冲和考试运行态 |
 | MinIO | `MINIO_ENDPOINT`、`MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY`、`MINIO_BUCKET` | 私有对象存储 |
 | JWT | `JWT_SECRET`、`JWT_ACCESS_TOKEN_TTL_MINUTES` | 生产环境单独生成 |
 | 上传 | `UPLOAD_MAX_FILE_SIZE`、`UPLOAD_MAX_FILES_PER_CONTENT` | 需与代理限制协调 |
@@ -419,7 +419,7 @@ Get-NetTCPConnection -LocalPort 5173,8080,3306,6379,9000,9001 `
 - [完整 HTTP API 文档](docs/API文档.md)
 - [代码导读与注释约定](docs/代码导读.md)
 - [AI 功能流程逻辑](AI功能流程逻辑.md)
-- [Redis 使用说明](redis使用说明.md)
+- [Redis 使用说明](开发文档/Redis使用说明.md)
 - [详细部署指南](项目部署.md)
 - [数据库初始化说明](database/README.md)
 - [本地 Redis 与 MinIO](infrastructure/README.md)

@@ -25,14 +25,17 @@ public class ExamStatisticsService {
     private final ExamService examService;
     /** 访问statistics持久化数据。 */
     private final ExamStatisticsMapper statisticsMapper;
+    private final ExamStatisticsCache statisticsCache;
 
     /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public ExamStatisticsService(
             ExamService examService,
-            ExamStatisticsMapper statisticsMapper
+            ExamStatisticsMapper statisticsMapper,
+            ExamStatisticsCache statisticsCache
     ) {
         this.examService = examService;
         this.statisticsMapper = statisticsMapper;
+        this.statisticsCache = statisticsCache;
     }
 
     /** 执行 statistics 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
@@ -42,6 +45,10 @@ public class ExamStatisticsService {
             boolean requesterAdmin
     ) {
         examService.detail(examId, requesterId, requesterAdmin);
+        return statisticsCache.get(examId, () -> loadStatistics(examId));
+    }
+
+    private ExamStatisticsResponse loadStatistics(Long examId) {
         ExamStatisticsSummary summary = statisticsMapper.summary(examId);
         int gradedCount = value(summary.getGradedCount());
         return new ExamStatisticsResponse(

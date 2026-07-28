@@ -43,6 +43,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final UserService userService;
     /** 委托角色执行对应领域规则。 */
     private final RoleService roleService;
+    /** 缓存认证所需的用户状态与角色快照，Redis 故障时自动回源数据库。 */
+    private final AuthSnapshotCache authSnapshotCache;
     /** 保存认证EntryPoint，供该类型的业务逻辑读取或更新。 */
     private final ApiAuthenticationEntryPoint authenticationEntryPoint;
 
@@ -51,11 +53,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             JwtTokenService tokenService,
             UserService userService,
             RoleService roleService,
+            AuthSnapshotCache authSnapshotCache,
             ApiAuthenticationEntryPoint authenticationEntryPoint
     ) {
         this.tokenService = tokenService;
         this.userService = userService;
         this.roleService = roleService;
+        this.authSnapshotCache = authSnapshotCache;
         this.authenticationEntryPoint = authenticationEntryPoint;
     }
 
@@ -101,18 +105,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     /** 执行 authenticate 对应职责；具体输入输出由方法签名和所属类型共同约束。 */
     private void authenticate(HttpServletRequest request, String token) {
         JwtTokenClaims claims = tokenService.parse(token);
-        User user = userService.findById(claims.userId())
-                .orElseThrow(() -> new BadCredentialsException("Token对应用户不存在"));
-        if (!user.getUsername().equals(claims.username())) {
+        AuthSnapshotCache.Snapshot snapshot = authSnapshotCache.getOrLoad(
+                claims.userId(),
+                () -> {
+                    User user = userService.findById(claims.userId())
+                            .orElseThrow(() -> new BadCredentialsException("Token对应用户不存在"));
+                    return new AuthSnapshotCache.Snapshot(
+                            user.getId(),
+                            user.getUsername(),
+                            user.getStatus(),
+                            roleService.findRoleCodesByUserId(user.getId())
+                    );
+                }
+        );
+        if (!snapshot.username().equals(claims.username())) {
             throw new BadCredentialsException("Token用户信息不一致");
         }
-        if (user.getStatus() != UserStatus.ACTIVE) {
+        if (snapshot.status() != UserStatus.ACTIVE) {
             throw new BadCredentialsException("账号当前不可用");
         }
 
-        Set<RoleCode> roles = roleService.findRoleCodesByUserId(user.getId());
+        Set<RoleCode> roles = snapshot.roles();
         AuthenticatedUserPrincipal principal =
-                new AuthenticatedUserPrincipal(user.getId(), user.getUsername(), roles);
+                new AuthenticatedUserPrincipal(snapshot.userId(), snapshot.username(), roles);
         UsernamePasswordAuthenticationToken authentication =
                 UsernamePasswordAuthenticationToken.authenticated(
                         principal,

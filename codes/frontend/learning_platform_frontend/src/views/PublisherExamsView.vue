@@ -334,7 +334,7 @@ onMounted(load)
       >
         <el-tag size="large" type="success">发布额度：{{ quota }} 次</el-tag>
         <RouterLink :to="{ path: '/commerce', query: { type: 'EXAM_PACKAGE' } }">
-          <el-button type="warning">模拟购买发布次数</el-button>
+          <el-button type="warning">购买发布次数</el-button>
         </RouterLink>
         <el-button type="primary" :icon="Plus" @click="openEditor()">新建考试</el-button>
       </SectionPageHeader>

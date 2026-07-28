@@ -87,8 +87,8 @@ const orderPreviewVisible = ref(false)
 const orderPreviewLoading = ref(false)
 const orderPreview = ref<Order>()
 const orderStatusLabels: Record<OrderStatus, string> = {
-  PENDING_PAYMENT: '待模拟支付',
-  PAID: '模拟支付成功',
+  PENDING_PAYMENT: '待支付',
+  PAID: '支付成功',
   CANCELLED: '已取消',
   CLOSED: '已关闭',
   REFUNDED: '已退款',
@@ -499,7 +499,7 @@ onMounted(() =>
       <SectionPageHeader
         eyebrow="ADMIN CONSOLE"
         title="平台管理后台"
-        description="统一管理用户与角色、学习资料、分类、考试、模拟订单和 AI 配置"
+        description=""
       >
         <RouterLink to="/admin/ai">
           <el-button type="primary" plain>查看 AI 配置</el-button>
@@ -774,12 +774,12 @@ onMounted(() =>
               />
               <el-button type="primary" @click="searchOperationLogs">查询</el-button>
             </div>
-            <el-alert
+            <!-- <el-alert
               title="日志仅保存操作元数据，不记录密码、令牌和请求正文"
               type="info"
               show-icon
               :closable="false"
-            />
+            /> -->
             <el-table v-loading="auditLoading" :data="operationLogs">
               <el-table-column label="时间 / 操作者" min-width="190">
                 <template #default="{ row }">
@@ -834,13 +834,6 @@ onMounted(() =>
           </el-tab-pane>
 
           <el-tab-pane label="订单管理" name="orders">
-            <el-alert
-              title="当前仅展示模拟支付订单"
-              description="这些订单和支付记录只用于开发验收，不对应任何真实资金交易。"
-              type="warning"
-              show-icon
-              :closable="false"
-            />
             <div class="order-toolbar">
               <el-input
                 v-model="orderFilters.orderNo"
@@ -855,8 +848,8 @@ onMounted(() =>
                 placeholder="用户 ID"
               />
               <el-select v-model="orderFilters.status" clearable placeholder="全部订单状态">
-                <el-option label="待模拟支付" value="PENDING_PAYMENT" />
-                <el-option label="模拟支付成功" value="PAID" />
+                <el-option label="待支付" value="PENDING_PAYMENT" />
+                <el-option label="支付成功" value="PAID" />
                 <el-option label="已取消" value="CANCELLED" />
                 <el-option label="已关闭" value="CLOSED" />
                 <el-option label="已退款" value="REFUNDED" />
@@ -878,7 +871,7 @@ onMounted(() =>
               </el-table-column>
               <el-table-column label="支付方式" width="130">
                 <template #default="{ row }">
-                  {{ row.paymentMethod === 'MOCK' ? '模拟支付' : '未支付' }}
+                  {{ row.paymentMethod === 'MOCK' ? '支付' : '未支付' }}
                 </template>
               </el-table-column>
               <el-table-column label="创建时间" min-width="180">
@@ -978,15 +971,15 @@ onMounted(() =>
       </div>
     </el-drawer>
 
-    <el-drawer v-model="orderPreviewVisible" title="模拟订单详情" size="620px">
+    <el-drawer v-model="orderPreviewVisible" title="订单详情" size="620px">
       <div v-loading="orderPreviewLoading" class="preview-content">
         <template v-if="orderPreview">
-          <el-alert
+          <!-- <el-alert
             title="模拟支付记录，不代表真实交易"
             type="warning"
             show-icon
             :closable="false"
-          />
+          /> -->
           <h2>{{ orderPreview.orderNo }}</h2>
           <el-descriptions :column="2" border>
             <el-descriptions-item label="用户 ID">{{ orderPreview.userId }}</el-descriptions-item>
@@ -1002,7 +995,7 @@ onMounted(() =>
             <el-descriptions-item label="创建时间">
               {{ dateTime(orderPreview.createdAt) }}
             </el-descriptions-item>
-            <el-descriptions-item label="模拟支付时间">
+            <el-descriptions-item label="支付时间">
               {{ dateTime(orderPreview.paidAt) }}
             </el-descriptions-item>
           </el-descriptions>
@@ -1011,14 +1004,14 @@ onMounted(() =>
             <strong>{{ item.productName }} × {{ item.quantity }}</strong>
             <span>{{ money(item.subtotalAmount) }}</span>
           </div>
-          <h3>模拟支付记录</h3>
+          <h3>支付记录</h3>
           <div v-for="payment in orderPreview.payments" :key="payment.id" class="payment-record">
             <strong>{{ payment.paymentNo }}</strong>
             <span>{{ payment.provider }} · {{ payment.status }} · {{ money(payment.amount) }}</span>
           </div>
           <el-empty
             v-if="orderPreview.payments.length === 0"
-            description="订单尚未进行模拟支付"
+            description="订单尚未进行支付"
             :image-size="70"
           />
         </template>

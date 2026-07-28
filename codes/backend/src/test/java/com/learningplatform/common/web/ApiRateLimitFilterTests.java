@@ -2,12 +2,18 @@ package com.learningplatform.common.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.learningplatform.common.config.ApiRateLimitProperties;
+import com.learningplatform.common.redis.RedisRequestLimiter;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ApiRateLimitFilterTests {
     private final ObjectMapper objectMapper =
@@ -89,6 +95,60 @@ class ApiRateLimitFilterTests {
                 disabled,
                 request("GET", "/api/contents", "10.0.0.4")
         ).getStatus()).isEqualTo(204);
+    }
+
+    @Test
+    void usesRedisFixedWindowDecisionWhenRedisIsAvailable()
+            throws Exception {
+        RedisRequestLimiter limiter = mock(RedisRequestLimiter.class);
+        when(limiter.acquireFixedWindow(
+                anyString(),
+                anyLong(),
+                anyLong(),
+                anyInt()
+        )).thenReturn(
+                new RedisRequestLimiter.FixedWindowDecision(false, 7)
+        );
+        ApiRateLimitFilter filter = new ApiRateLimitFilter(
+                new ApiRateLimitProperties(true, 10, 10, 10),
+                objectMapper,
+                java.time.Clock.systemUTC(),
+                limiter
+        );
+
+        MockHttpServletResponse response = execute(
+                filter,
+                request("GET", "/api/contents", "10.0.0.5")
+        );
+
+        assertThat(response.getStatus()).isEqualTo(429);
+        assertThat(response.getHeader("Retry-After")).isEqualTo("7");
+    }
+
+    @Test
+    void fallsBackToLocalCounterWhenRedisFails() throws Exception {
+        RedisRequestLimiter limiter = mock(RedisRequestLimiter.class);
+        when(limiter.acquireFixedWindow(
+                anyString(),
+                anyLong(),
+                anyLong(),
+                anyInt()
+        )).thenThrow(new IllegalStateException("redis unavailable"));
+        ApiRateLimitFilter filter = new ApiRateLimitFilter(
+                new ApiRateLimitProperties(true, 1, 1, 1),
+                objectMapper,
+                java.time.Clock.systemUTC(),
+                limiter
+        );
+
+        assertThat(execute(
+                filter,
+                request("GET", "/api/contents", "10.0.0.6")
+        ).getStatus()).isEqualTo(204);
+        assertThat(execute(
+                filter,
+                request("GET", "/api/contents", "10.0.0.6")
+        ).getStatus()).isEqualTo(429);
     }
 
     private ApiRateLimitFilter filter(

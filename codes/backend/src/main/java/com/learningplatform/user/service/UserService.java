@@ -11,6 +11,7 @@ import com.learningplatform.user.domain.UserStatus;
 import com.learningplatform.user.mapper.UserMapper;
 import com.learningplatform.common.page.PageQuery;
 import com.learningplatform.common.page.PageResult;
+import com.learningplatform.auth.security.AuthSnapshotCache;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,10 +28,18 @@ import java.util.Optional;
 public class UserService {
     /** 访问用户持久化数据。 */
     private final UserMapper userMapper;
+    private final AuthSnapshotCache authSnapshotCache;
+    private final PublicUserProfileCache publicUserProfileCache;
 
     /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
-    public UserService(UserMapper userMapper) {
+    public UserService(
+            UserMapper userMapper,
+            AuthSnapshotCache authSnapshotCache,
+            PublicUserProfileCache publicUserProfileCache
+    ) {
         this.userMapper = userMapper;
+        this.authSnapshotCache = authSnapshotCache;
+        this.publicUserProfileCache = publicUserProfileCache;
     }
 
     /** 按ID查询数据；只返回当前调用方有权查看的结果。 */
@@ -109,6 +118,8 @@ public class UserService {
         if (userMapper.updateProfile(user) != 1) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
         }
+        authSnapshotCache.evictAfterCommit(user.getId());
+        publicUserProfileCache.evictAfterCommit(user.getId());
     }
 
     @Transactional
@@ -125,6 +136,7 @@ public class UserService {
         if (userMapper.updatePasswordHash(userId, passwordHash) != 1) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
         }
+        authSnapshotCache.evictAfterCommit(userId);
     }
 
     @Transactional
@@ -141,5 +153,7 @@ public class UserService {
         if (userMapper.updateStatus(userId, status) != 1) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "用户不存在");
         }
+        authSnapshotCache.evictAfterCommit(userId);
+        publicUserProfileCache.evictAfterCommit(userId);
     }
 }

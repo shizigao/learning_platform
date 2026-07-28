@@ -22,7 +22,9 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
       database: ${REDIS_DATABASE:0}
-      timeout: 3s
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${REDIS_COMMAND_TIMEOUT:1s}
+      client-name: learning-platform-backend
   servlet:
     multipart:
       max-file-size: 200MB
@@ -63,6 +65,16 @@ management:
 
 app:
   environment: ${APP_ENV:local}
+  redis:
+    distributed-guards-enabled: ${REDIS_DISTRIBUTED_GUARDS_ENABLED:true}
+    auth-snapshot-enabled: ${REDIS_AUTH_SNAPSHOT_ENABLED:true}
+    auth-snapshot-ttl: ${REDIS_AUTH_SNAPSHOT_TTL_SECONDS:60}s
+    read-cache-enabled: ${REDIS_READ_CACHE_ENABLED:true}
+    authorization-cache-enabled: ${REDIS_AUTHORIZATION_CACHE_ENABLED:true}
+    authorization-cache-ttl: ${REDIS_AUTHORIZATION_CACHE_TTL_SECONDS:30}s
+    content-view-buffer-enabled: ${REDIS_CONTENT_VIEW_BUFFER_ENABLED:true}
+    content-view-flush-ms: ${REDIS_CONTENT_VIEW_FLUSH_MILLIS:30000}
+    content-view-flush-initial-delay-ms: ${REDIS_CONTENT_VIEW_FLUSH_INITIAL_DELAY_MILLIS:30000}
   offline-teaching:
     security:
       encryption-key: ${TEACHER_DATA_ENCRYPTION_KEY:}

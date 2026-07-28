@@ -150,6 +150,18 @@ public interface LearningContentMapper {
 
     @Update("""
             UPDATE learning_content
+            SET view_count = view_count + #{delta}
+            WHERE id = #{id} AND deleted = 0 AND status = 'PUBLISHED'
+              AND #{delta} > 0
+            """)
+    /** 按给定增量批量累加浏览量，供 Redis 缓冲计数回写数据库。 */
+    int incrementViewCountBy(
+            @Param("id") Long id,
+            @Param("delta") long delta
+    );
+
+    @Update("""
+            UPDATE learning_content
             SET like_count = like_count + 1
             WHERE id = #{id} AND deleted = 0 AND status = 'PUBLISHED'
             """)

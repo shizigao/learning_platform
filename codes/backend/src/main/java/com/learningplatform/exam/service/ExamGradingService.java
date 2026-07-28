@@ -51,6 +51,7 @@ public class ExamGradingService {
     private final ExamResultMapper resultMapper;
     /** 委托presentation执行对应领域规则。 */
     private final ExamAnswerPresentationService presentationService;
+    private final ExamStatisticsCache statisticsCache;
 
     /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public ExamGradingService(
@@ -58,13 +59,15 @@ public class ExamGradingService {
             ExamAnswerMapper answerMapper,
             ExamAttemptMapper attemptMapper,
             ExamResultMapper resultMapper,
-            ExamAnswerPresentationService presentationService
+            ExamAnswerPresentationService presentationService,
+            ExamStatisticsCache statisticsCache
     ) {
         this.examService = examService;
         this.answerMapper = answerMapper;
         this.attemptMapper = attemptMapper;
         this.resultMapper = resultMapper;
         this.presentationService = presentationService;
+        this.statisticsCache = statisticsCache;
     }
 
     @Transactional
@@ -78,6 +81,7 @@ public class ExamGradingService {
             }
         }
         refreshResult(attempt, exam, true);
+        statisticsCache.evictAfterCommit(exam.getId());
         return attemptMapper.findById(attempt.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR, "作答记录不存在"));
     }
@@ -147,6 +151,7 @@ public class ExamGradingService {
             throw new BusinessException(ErrorCode.CONFLICT, "答案状态已发生变化，请刷新后重试");
         }
         refreshResult(attempt, exam, false);
+        statisticsCache.evictAfterCommit(examId);
         return presentationService.response(answer, true);
     }
 
@@ -164,6 +169,7 @@ public class ExamGradingService {
             throw new BusinessException(ErrorCode.CONFLICT, "仍有主观题尚未批改");
         }
         ExamResult result = refreshResult(attempt, exam, true);
+        statisticsCache.evictAfterCommit(examId);
         List<ExamResultQuestionResponse> questions = answerMapper.findByAttemptId(attemptId)
                 .stream()
                 .map(answer -> presentationService.response(answer, true))

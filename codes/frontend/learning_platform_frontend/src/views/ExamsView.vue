@@ -40,7 +40,7 @@ onMounted(load)
       <SectionPageHeader
         eyebrow="EXAM CENTER"
         title="考试中心"
-        description="查看考试说明、检查参与资格，并由服务器记录正式开始时间"
+        description="诚信考试 注意考试截止时间"
       >
         <RouterLink to="/exams/wrong-review">
           <el-button type="primary">错题复习</el-button>

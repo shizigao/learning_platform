@@ -155,7 +155,7 @@ onBeforeUnmount(stopReadingProgressTracking)
               应用当前进度
             </el-button>
           </div>
-          <p>学习进度可按 1% 调整，也可以向前或向后修改。</p>
+          <p>学习进度</p>
           <el-slider v-model="percent" :step="1" show-input />
           <el-input v-model="lastPosition" maxlength="255" placeholder="例如：第 6 页、12:30 或第三章" />
           <el-button type="primary" :loading="saving" @click="saveProgress()">保存学习进度</el-button>

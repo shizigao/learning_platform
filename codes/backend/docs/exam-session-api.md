@@ -50,8 +50,9 @@ deadline_at = min(started_at + duration_minutes, exam.end_at)
 重复交卷不会重复生成结果，也不会改变首次提交时间。
 
 后台定时任务默认每 5 秒扫描一次 MySQL 中已到截止时间但仍在作答的记录，并以 `TIMEOUT` 类型
-自动提交。MySQL 是截止时间和提交状态的可靠数据源；Redis 只缓存倒计时和最近保存时间，
-Redis 不可用时答题保存、恢复和超时交卷仍可正常工作。扫描间隔可通过
+自动提交。MySQL 是截止时间和提交状态的可靠数据源；Redis ZSET 用于快速领取到期
+作答，并缓存倒计时和最近保存时间。Redis 不可用时会立即回退 MySQL 扫描，正常运行时
+也会周期性使用 MySQL 修复丢失索引。扫描间隔可通过
 `EXAM_TIMEOUT_SCAN_MS` 调整。
 
 ## 评分规则

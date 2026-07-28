@@ -18,7 +18,9 @@ import com.learningplatform.order.domain.EntitlementType;
 import com.learningplatform.order.domain.UserEntitlement;
 import com.learningplatform.order.service.EntitlementService;
 import com.learningplatform.classroom.mapper.ClassScopeMapper;
+import com.learningplatform.common.redis.AuthorizationDecisionCache;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -41,20 +43,44 @@ public class ContentAccessService {
     private final MinioStorageService storageService;
     /** 访问班级范围持久化数据。 */
     private final ClassScopeMapper classScopeMapper;
+    private final AuthorizationDecisionCache authorizationDecisionCache;
 
     /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
+    @Autowired
     public ContentAccessService(
             LearningContentMapper contentMapper,
             ContentFileMapper fileMapper,
             EntitlementService entitlementService,
             MinioStorageService storageService,
-            ClassScopeMapper classScopeMapper
+            ClassScopeMapper classScopeMapper,
+            AuthorizationDecisionCache authorizationDecisionCache
     ) {
         this.contentMapper = contentMapper;
         this.fileMapper = fileMapper;
         this.entitlementService = entitlementService;
         this.storageService = storageService;
         this.classScopeMapper = classScopeMapper;
+        this.authorizationDecisionCache = authorizationDecisionCache;
+    }
+
+    /**
+     * 保留给不启动 Spring 容器的既有单元测试；生产环境使用包含 Redis 缓存的构造器。
+     */
+    ContentAccessService(
+            LearningContentMapper contentMapper,
+            ContentFileMapper fileMapper,
+            EntitlementService entitlementService,
+            MinioStorageService storageService,
+            ClassScopeMapper classScopeMapper
+    ) {
+        this(
+                contentMapper,
+                fileMapper,
+                entitlementService,
+                storageService,
+                classScopeMapper,
+                null
+        );
     }
 
     /**
@@ -69,10 +95,28 @@ public class ContentAccessService {
             return true;
         }
         if (content.getDistributionMode() == ContentDistributionMode.CLASS) {
-            return userId != null && classScopeMapper.hasContentAccess(content.getId(), userId);
+            if (userId == null) {
+                return false;
+            }
+            return authorizationDecisionCache == null
+                    ? classScopeMapper.hasContentAccess(content.getId(), userId)
+                    : authorizationDecisionCache.contentClassAccess(
+                            userId,
+                            content.getId(),
+                            () -> classScopeMapper.hasContentAccess(content.getId(), userId)
+                    );
         }
         if (Boolean.TRUE.equals(content.getFree())) return true;
-        return entitlementService.hasActiveContentAccess(userId, content.getId());
+        if (userId == null) {
+            return false;
+        }
+        return authorizationDecisionCache == null
+                ? entitlementService.hasActiveContentAccess(userId, content.getId())
+                : authorizationDecisionCache.contentEntitlement(
+                        userId,
+                        content.getId(),
+                        () -> entitlementService.hasActiveContentAccess(userId, content.getId())
+                );
     }
 
     /** 校验访问权及相关业务前置条件，不满足时抛出明确业务异常。 */

@@ -1,6 +1,7 @@
 package com.learningplatform.ai.service;
 
 import com.learningplatform.common.config.AiProperties;
+import com.learningplatform.common.redis.RedisRequestLimiter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
@@ -14,6 +15,13 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class AiRequestGuardTests {
     private AiRequestGuard guard;
@@ -179,6 +187,87 @@ class AiRequestGuardTests {
 
         release.countDown();
         assertThat(stopped.await(1, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test
+    void usesRedisSlidingWindowAndReleasesOwnedLease() {
+        RedisRequestLimiter limiter = mock(RedisRequestLimiter.class);
+        RedisRequestLimiter.Lease lease =
+                new RedisRequestLimiter.Lease("lease-key", "owner-token");
+        when(limiter.acquireSlidingWindow(
+                anyString(),
+                anyLong(),
+                any(Duration.class),
+                anyInt()
+        )).thenReturn(true);
+        when(limiter.tryAcquireLease(
+                anyString(),
+                anyInt(),
+                any(Duration.class)
+        )).thenReturn(lease);
+        guard = new AiRequestGuard(properties(
+                10,
+                1,
+                Duration.ofMinutes(1),
+                Duration.ofSeconds(1)
+        ), limiter);
+
+        assertThat(guard.execute(10L, () -> "ok")).isEqualTo("ok");
+
+        verify(limiter).releaseLease(lease);
+    }
+
+    @Test
+    void rejectsWhenRedisSlidingWindowIsFull() {
+        RedisRequestLimiter limiter = mock(RedisRequestLimiter.class);
+        when(limiter.acquireSlidingWindow(
+                anyString(),
+                anyLong(),
+                any(Duration.class),
+                anyInt()
+        )).thenReturn(false);
+        guard = new AiRequestGuard(properties(
+                1,
+                1,
+                Duration.ofMinutes(1),
+                Duration.ofSeconds(1)
+        ), limiter);
+
+        assertThatThrownBy(() -> guard.execute(11L, () -> "blocked"))
+                .isInstanceOfSatisfying(
+                        AiRequestGuard.GuardException.class,
+                        exception -> assertThat(exception.getFailure())
+                                .isEqualTo(
+                                        AiRequestGuard.GuardFailure.RATE_LIMIT
+                                )
+                );
+    }
+
+    @Test
+    void fallsBackToLocalGuardWhenRedisFails() {
+        RedisRequestLimiter limiter = mock(RedisRequestLimiter.class);
+        when(limiter.acquireSlidingWindow(
+                anyString(),
+                anyLong(),
+                any(Duration.class),
+                anyInt()
+        )).thenThrow(new IllegalStateException("redis unavailable"));
+        guard = new AiRequestGuard(properties(
+                1,
+                1,
+                Duration.ofMinutes(1),
+                Duration.ofSeconds(1)
+        ), limiter);
+
+        assertThat(guard.execute(12L, () -> "ok")).isEqualTo("ok");
+        assertThatThrownBy(() -> guard.execute(12L, () -> "again"))
+                .isInstanceOfSatisfying(
+                        AiRequestGuard.GuardException.class,
+                        exception -> assertThat(exception.getFailure())
+                                .isEqualTo(
+                                        AiRequestGuard.GuardFailure.RATE_LIMIT
+                                )
+                );
     }
 
     private AiProperties properties(

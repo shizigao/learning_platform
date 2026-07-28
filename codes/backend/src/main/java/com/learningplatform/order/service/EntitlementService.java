@@ -20,6 +20,7 @@ import com.learningplatform.order.mapper.OrderMapper;
 import com.learningplatform.order.mapper.UserEntitlementMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.learningplatform.common.redis.AuthorizationDecisionCache;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -40,16 +41,19 @@ public class EntitlementService {
     private final OrderMapper orderMapper;
     /** 访问item持久化数据。 */
     private final OrderItemMapper itemMapper;
+    private final AuthorizationDecisionCache authorizationDecisionCache;
 
     /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public EntitlementService(
             UserEntitlementMapper entitlementMapper,
             OrderMapper orderMapper,
-            OrderItemMapper itemMapper
+            OrderItemMapper itemMapper,
+            AuthorizationDecisionCache authorizationDecisionCache
     ) {
         this.entitlementMapper = entitlementMapper;
         this.orderMapper = orderMapper;
         this.itemMapper = itemMapper;
+        this.authorizationDecisionCache = authorizationDecisionCache;
     }
 
     /** 列出用户全部权益批次，包含已用完或失效批次供历史展示。 */
@@ -162,6 +166,9 @@ public class EntitlementService {
         }
         if (entitlementMapper.insert(entitlement) != 1) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "创建用户权益失败");
+        }
+        if (entitlement.getEntitlementType() == EntitlementType.CONTENT_ACCESS) {
+            authorizationDecisionCache.bumpUserAfterCommit(entitlement.getUserId());
         }
         return EntitlementResponse.from(entitlement);
     }

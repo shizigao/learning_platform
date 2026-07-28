@@ -23,6 +23,7 @@ import com.learningplatform.user.domain.UserStatus;
 import com.learningplatform.user.service.RoleService;
 import com.learningplatform.user.service.UserService;
 import com.learningplatform.user.service.UserAvatarService;
+import com.learningplatform.common.redis.AuthorizationDecisionCache;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +52,7 @@ public class ClassroomService {
     private final RoleService roleService;
     /** 委托头像执行对应领域规则。 */
     private final UserAvatarService avatarService;
+    private final AuthorizationDecisionCache authorizationDecisionCache;
     private final SecureRandom secureRandom = new SecureRandom();
 
     /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
@@ -58,12 +60,14 @@ public class ClassroomService {
             ClassroomMapper mapper,
             UserService userService,
             RoleService roleService,
-            UserAvatarService avatarService
+            UserAvatarService avatarService,
+            AuthorizationDecisionCache authorizationDecisionCache
     ) {
         this.mapper = mapper;
         this.userService = userService;
         this.roleService = roleService;
         this.avatarService = avatarService;
+        this.authorizationDecisionCache = authorizationDecisionCache;
     }
 
     /** 创建或初始化edClasses，并维护唯一性、初始状态和必要关联。 */
@@ -114,6 +118,7 @@ public class ClassroomService {
         if (mapper.insertMember(ownerMember) != 1) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "创建班级拥有者失败");
         }
+        authorizationDecisionCache.bumpUserAfterCommit(ownerId);
         return response(getRequired(classroom.getId()), ownerId);
     }
 
@@ -164,6 +169,7 @@ public class ClassroomService {
                 throw new BusinessException(ErrorCode.INTERNAL_ERROR, "加入班级失败");
             }
         }
+        authorizationDecisionCache.bumpUserAfterCommit(userId);
         return response(classroom, userId);
     }
 
@@ -177,6 +183,7 @@ public class ClassroomService {
         if (mapper.updateMemberStatus(classId, userId, ClassMemberStatus.LEFT) != 1) {
             throw new BusinessException(ErrorCode.CONFLICT, "退出班级失败，请重试");
         }
+        authorizationDecisionCache.bumpUserAfterCommit(userId);
     }
 
     /** 执行 members 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
@@ -249,6 +256,7 @@ public class ClassroomService {
         if (mapper.updateMemberRole(classId, targetUserId, role) != 1) {
             throw new BusinessException(ErrorCode.CONFLICT, "成员角色更新失败，请重试");
         }
+        authorizationDecisionCache.bumpUserAfterCommit(targetUserId);
     }
 
     @Transactional
@@ -265,6 +273,7 @@ public class ClassroomService {
         if (mapper.updateMemberStatus(classId, targetUserId, ClassMemberStatus.REMOVED) != 1) {
             throw new BusinessException(ErrorCode.CONFLICT, "移除成员失败，请重试");
         }
+        authorizationDecisionCache.bumpUserAfterCommit(targetUserId);
     }
 
     @Transactional
@@ -274,6 +283,7 @@ public class ClassroomService {
         if (mapper.restoreMember(classId, targetUserId) != 1) {
             throw new BusinessException(ErrorCode.CONFLICT, "该用户当前不处于被移除状态");
         }
+        authorizationDecisionCache.bumpUserAfterCommit(targetUserId);
     }
 
     @Transactional
@@ -296,6 +306,8 @@ public class ClassroomService {
                 || mapper.updateOwner(classId, targetUserId) != 1) {
             throw new BusinessException(ErrorCode.CONFLICT, "转让班级失败，请重试");
         }
+        authorizationDecisionCache.bumpUserAfterCommit(requesterId);
+        authorizationDecisionCache.bumpUserAfterCommit(targetUserId);
         return response(getRequired(classId), requesterId);
     }
 

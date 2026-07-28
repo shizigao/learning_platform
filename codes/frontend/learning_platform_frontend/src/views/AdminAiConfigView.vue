@@ -50,7 +50,7 @@ onMounted(load)
       <SectionPageHeader
         eyebrow="ADMIN · AI CONFIGURATION"
         title="AI 运行配置"
-        description="查看后端当前生效的供应商、模型与安全限制；密钥始终只保存在后端环境变量中"
+        description=""
       >
         <RouterLink to="/admin"><el-button>返回管理后台</el-button></RouterLink>
         <el-button type="primary" :icon="Refresh" @click="load">刷新配置</el-button>
@@ -67,7 +67,7 @@ onMounted(load)
           </article>
           <article>
             <el-icon><Key /></el-icon>
-            <div><span>真实 API Key</span><strong>{{ config.apiKeyConfigured ? '已配置' : '未配置' }}</strong><small>页面永不返回密钥内容</small></div>
+            <div><span>API Key</span><strong>{{ config.apiKeyConfigured ? '已配置' : '未配置' }}</strong><small>已成功配置API key</small></div>
             <el-tag :type="config.apiKeyConfigured ? 'success' : 'info'">
               {{ config.apiKeyConfigured ? '安全就绪' : '保持 Mock' }}
             </el-tag>

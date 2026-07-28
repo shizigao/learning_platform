@@ -8,6 +8,8 @@ import com.learningplatform.common.api.ErrorCode;
 import com.learningplatform.common.config.MinioProperties;
 import com.learningplatform.common.exception.BusinessException;
 import com.learningplatform.content.storage.FileContentSignatureValidator;
+import com.learningplatform.common.redis.RedisJsonCache;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.learningplatform.user.domain.User;
 import com.learningplatform.user.domain.UserAvatar;
 import com.learningplatform.user.mapper.UserAvatarMapper;
@@ -27,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Duration;
 
 @Service
 /**
@@ -35,6 +38,8 @@ import java.util.UUID;
  * <p>职责边界：业务状态变化在此集中完成；跨表写入需保持事务一致性。</p>
  */
 public class UserAvatarService {
+    private static final TypeReference<String> STRING_TYPE = new TypeReference<>() {
+    };
     private static final Logger log = LoggerFactory.getLogger(UserAvatarService.class);
     /** 定义 MAX_AVATAR_BYTES 常量，统一该组件使用的固定规则或默认值。 */
     private static final long MAX_AVATAR_BYTES = 5L * 1024L * 1024L;
@@ -55,6 +60,8 @@ public class UserAvatarService {
     private final MinioProperties minioProperties;
     /** 保存signature校验器，供该类型的业务逻辑读取或更新。 */
     private final FileContentSignatureValidator signatureValidator;
+    private final PublicUserProfileCache publicUserProfileCache;
+    private final RedisJsonCache redisJsonCache;
 
     /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public UserAvatarService(
@@ -62,31 +69,45 @@ public class UserAvatarService {
             UserService userService,
             MinioClient minioClient,
             MinioProperties minioProperties,
-            FileContentSignatureValidator signatureValidator
+            FileContentSignatureValidator signatureValidator,
+            PublicUserProfileCache publicUserProfileCache,
+            RedisJsonCache redisJsonCache
     ) {
         this.avatarMapper = avatarMapper;
         this.userService = userService;
         this.minioClient = minioClient;
         this.minioProperties = minioProperties;
         this.signatureValidator = signatureValidator;
+        this.publicUserProfileCache = publicUserProfileCache;
+        this.redisJsonCache = redisJsonCache;
     }
 
     /** 执行 avatarUrl 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public String avatarUrl(User user) {
         if (user == null || user.getId() == null) return null;
-        return avatarMapper.findByUserId(user.getId())
-                .map(this::platformUrl)
-                .orElse(user.getAvatarUrl());
+        return redisJsonCache.get(
+                avatarCacheKey(user.getId()),
+                STRING_TYPE,
+                Duration.ofMinutes(10),
+                () -> avatarMapper.findByUserId(user.getId())
+                        .map(this::platformUrl)
+                        .orElse(user.getAvatarUrl())
+        );
     }
 
     /** 执行 avatarUrl 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     public String avatarUrl(Long userId) {
         if (userId == null) return null;
-        return avatarMapper.findByUserId(userId)
-                .map(this::platformUrl)
-                .orElseGet(() -> userService.findById(userId)
-                        .map(User::getAvatarUrl)
-                        .orElse(null));
+        return redisJsonCache.get(
+                avatarCacheKey(userId),
+                STRING_TYPE,
+                Duration.ofMinutes(10),
+                () -> avatarMapper.findByUserId(userId)
+                        .map(this::platformUrl)
+                        .orElseGet(() -> userService.findById(userId)
+                                .map(User::getAvatarUrl)
+                                .orElse(null))
+        );
     }
 
     /** 查询目标相关数据；只返回当前调用方有权查看的结果。 */
@@ -171,6 +192,8 @@ public class UserAvatarService {
         if (previous != null && !previous.getObjectName().equals(objectName)) {
             removeQuietly(previous.getBucketName(), previous.getObjectName());
         }
+        publicUserProfileCache.evictAfterCommit(userId);
+        redisJsonCache.evictAfterCommit(avatarCacheKey(userId));
         return platformUrl(avatarMapper.findByUserId(userId).orElse(avatar));
     }
 
@@ -187,6 +210,8 @@ public class UserAvatarService {
         if (userService.getRequiredById(userId).getAvatarUrl() != null) {
             userService.clearAvatarUrl(userId);
         }
+        publicUserProfileCache.evictAfterCommit(userId);
+        redisJsonCache.evictAfterCommit(avatarCacheKey(userId));
     }
 
     /** 校验及相关业务前置条件，不满足时抛出明确业务异常。 */
@@ -242,5 +267,9 @@ public class UserAvatarService {
 
     /** 校验d头像及相关业务前置条件，不满足时抛出明确业务异常。 */
     private record ValidatedAvatar(String originalName, String extension, String contentType) {
+    }
+
+    private String avatarCacheKey(Long userId) {
+        return "lp:v1:user:avatar-url:" + userId;
     }
 }

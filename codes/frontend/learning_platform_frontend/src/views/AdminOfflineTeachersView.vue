@@ -208,13 +208,13 @@ onMounted(load)
           </el-select>
           <el-button type="primary" @click="search">查询</el-button>
         </div>
-        <el-alert
+        <!-- <el-alert
           title="身份证号属于敏感信息"
           description="只在审核详情中查看，不得复制到日志、截图或其他系统；页面关闭后不再保留。"
           type="warning"
           show-icon
           :closable="false"
-        />
+        /> -->
         <el-table v-loading="loading" :data="applications">
           <el-table-column label="申请人" min-width="180">
             <template #default="{ row }">

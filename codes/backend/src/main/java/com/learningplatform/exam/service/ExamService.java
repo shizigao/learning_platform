@@ -9,6 +9,7 @@ import com.learningplatform.common.exception.BusinessException;
 import com.learningplatform.common.page.PageResult;
 import com.learningplatform.common.page.PageQuery;
 import com.learningplatform.classroom.mapper.ClassScopeMapper;
+import com.learningplatform.common.redis.AuthorizationDecisionCache;
 import com.learningplatform.classroom.service.ClassroomService;
 import com.learningplatform.exam.domain.Exam;
 import com.learningplatform.exam.domain.ExamAssignmentMode;
@@ -55,6 +56,7 @@ public class ExamService {
     private final UserService userService;
     /** 访问班级范围持久化数据。 */
     private final ClassScopeMapper classScopeMapper;
+    private final AuthorizationDecisionCache authorizationDecisionCache;
     /** 委托班级执行对应领域规则。 */
     private final ClassroomService classroomService;
 
@@ -66,7 +68,8 @@ public class ExamService {
             ExamPublishQuotaService quotaService,
             UserService userService,
             ClassScopeMapper classScopeMapper,
-            ClassroomService classroomService
+            ClassroomService classroomService,
+            AuthorizationDecisionCache authorizationDecisionCache
     ) {
         this.examMapper = examMapper;
         this.candidateMapper = candidateMapper;
@@ -75,6 +78,7 @@ public class ExamService {
         this.userService = userService;
         this.classScopeMapper = classScopeMapper;
         this.classroomService = classroomService;
+        this.authorizationDecisionCache = authorizationDecisionCache;
     }
 
     /** 查询目标相关数据；只返回当前调用方有权查看的结果。 */
@@ -358,7 +362,11 @@ public class ExamService {
     /** 校验考生访问权及相关业务前置条件，不满足时抛出明确业务异常。 */
     public ExamCandidate ensureCandidateAccess(Exam exam, Long userId) {
         if (exam.getAssignmentMode() == ExamAssignmentMode.CLASS) {
-            if (!classScopeMapper.hasExamAccess(exam.getId(), userId)) {
+            if (!authorizationDecisionCache.examClassAccess(
+                    userId,
+                    exam.getId(),
+                    () -> classScopeMapper.hasExamAccess(exam.getId(), userId)
+            )) {
                 throw new BusinessException(ErrorCode.FORBIDDEN, "仅考试指定班级的有效成员可以进入");
             }
             if (!candidateMapper.exists(exam.getId(), userId)) {
@@ -389,6 +397,7 @@ public class ExamService {
             ExamAssignmentMode mode
     ) {
         classScopeMapper.deleteExamScopes(examId);
+        authorizationDecisionCache.bumpExamAfterCommit(examId);
         if (mode != ExamAssignmentMode.CLASS) return;
         classIds.forEach(classId -> {
             if (classScopeMapper.insertExamScope(examId, classId) != 1) {

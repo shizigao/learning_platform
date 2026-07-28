@@ -10,6 +10,12 @@ spring:
       port: 6379
 
 app:
+  redis:
+    distributed-guards-enabled: false
+    auth-snapshot-enabled: false
+    content-view-buffer-enabled: false
+    read-cache-enabled: false
+    authorization-cache-enabled: false
   offline-teaching:
     security:
       encryption-key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=

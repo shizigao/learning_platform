@@ -30,9 +30,12 @@ import com.learningplatform.content.storage.MinioStorageService;
 import com.learningplatform.user.domain.User;
 import com.learningplatform.user.service.UserAvatarService;
 import com.learningplatform.user.service.UserService;
+import com.learningplatform.user.service.PublicUserProfileCache;
+import com.learningplatform.common.redis.AuthorizationDecisionCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -67,8 +70,13 @@ public class LearningContentService {
     private final UserService userService;
     /** 委托头像执行对应领域规则。 */
     private final UserAvatarService avatarService;
+    /** 缓冲并批量回写学习资料浏览量。 */
+    private final ContentViewCountService viewCountService;
+    private final AuthorizationDecisionCache authorizationDecisionCache;
+    private final PublicUserProfileCache publicUserProfileCache;
 
     /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
+    @Autowired
     public LearningContentService(
             LearningContentMapper contentMapper,
             ContentFileMapper fileMapper,
@@ -78,7 +86,10 @@ public class LearningContentService {
             ClassScopeMapper classScopeMapper,
             ClassroomService classroomService,
             UserService userService,
-            UserAvatarService avatarService
+            UserAvatarService avatarService,
+            ContentViewCountService viewCountService,
+            AuthorizationDecisionCache authorizationDecisionCache,
+            PublicUserProfileCache publicUserProfileCache
     ) {
         this.contentMapper = contentMapper;
         this.fileMapper = fileMapper;
@@ -89,6 +100,37 @@ public class LearningContentService {
         this.classroomService = classroomService;
         this.userService = userService;
         this.avatarService = avatarService;
+        this.viewCountService = viewCountService;
+        this.authorizationDecisionCache = authorizationDecisionCache;
+        this.publicUserProfileCache = publicUserProfileCache;
+    }
+
+    LearningContentService(
+            LearningContentMapper contentMapper,
+            ContentFileMapper fileMapper,
+            ContentCategoryService categoryService,
+            ContentAccessService accessService,
+            MinioStorageService storageService,
+            ClassScopeMapper classScopeMapper,
+            ClassroomService classroomService,
+            UserService userService,
+            UserAvatarService avatarService,
+            ContentViewCountService viewCountService
+    ) {
+        this(
+                contentMapper,
+                fileMapper,
+                categoryService,
+                accessService,
+                storageService,
+                classScopeMapper,
+                classroomService,
+                userService,
+                avatarService,
+                viewCountService,
+                null,
+                null
+        );
     }
 
     @Transactional
@@ -103,6 +145,7 @@ public class LearningContentService {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "创建学习资料失败");
         }
         replaceClassScopes(content.getId(), publisherId, request);
+        invalidateAuthorization(content.getId());
         return publisherDetail(content.getId(), publisherId, false);
     }
 
@@ -127,6 +170,7 @@ public class LearningContentService {
             throw invalidState("只有草稿或已驳回资料可以编辑");
         }
         replaceClassScopes(contentId, requesterUserId, request);
+        invalidateAuthorization(contentId);
         return publisherDetail(contentId, requesterUserId, requesterAdmin);
     }
 
@@ -163,13 +207,15 @@ public class LearningContentService {
         if (content.getStatus() != ContentStatus.PUBLISHED) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "学习资料不存在或尚未发布");
         }
-        contentMapper.incrementViewCount(contentId);
-        content.setViewCount(valueOrZero(content.getViewCount()) + 1);
         boolean hasAccess = accessService.hasAccess(requesterUserId, requesterAdmin, content);
         if (content.getDistributionMode() == ContentDistributionMode.CLASS && !hasAccess) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "仅资料发放班级的有效成员可以访问");
         }
-        return detail(content, hasAccess, hasAccess);
+        long viewCount = viewCountService.incrementAndGet(
+                contentId,
+                valueOrZero(content.getViewCount())
+        );
+        return detail(content, hasAccess, hasAccess, viewCount);
     }
 
     /** 执行发布状态流转，仅允许从合法前置状态进入目标状态。 */
@@ -294,6 +340,7 @@ public class LearningContentService {
         if (contentMapper.submit(contentId, publisherId, LocalDateTime.now()) != 1) {
             throw invalidState("当前资料状态不能提交审核");
         }
+        invalidateAuthorization(contentId);
         return publisherDetail(contentId, publisherId, false);
     }
 
@@ -305,6 +352,8 @@ public class LearningContentService {
                 || contentMapper.approve(contentId, LocalDateTime.now()) != 1) {
             throw invalidState("只有待审核资料可以审核通过");
         }
+        invalidateAuthorization(contentId);
+        invalidatePublicProfile(content.getPublisherId());
         return detail(getRequired(contentId), true, true);
     }
 
@@ -316,6 +365,7 @@ public class LearningContentService {
                 || contentMapper.reject(contentId, reason.trim()) != 1) {
             throw invalidState("只有待审核资料可以驳回");
         }
+        invalidateAuthorization(contentId);
         return detail(getRequired(contentId), true, true);
     }
 
@@ -327,6 +377,8 @@ public class LearningContentService {
                 || contentMapper.takeOffline(contentId) != 1) {
             throw invalidState("只有已发布资料可以下架");
         }
+        invalidateAuthorization(contentId);
+        invalidatePublicProfile(content.getPublisherId());
         return detail(getRequired(contentId), true, true);
     }
 
@@ -338,6 +390,8 @@ public class LearningContentService {
                 || contentMapper.republish(contentId, LocalDateTime.now()) != 1) {
             throw invalidState("只有已下架资料可以重新发布");
         }
+        invalidateAuthorization(contentId);
+        invalidatePublicProfile(content.getPublisherId());
         return detail(getRequired(contentId), true, true);
     }
 
@@ -350,6 +404,8 @@ public class LearningContentService {
         if (contentMapper.softDelete(contentId, content.getPublisherId()) != 1) {
             throw invalidState("只有草稿或已驳回资料可以删除");
         }
+        invalidateAuthorization(contentId);
+        invalidatePublicProfile(content.getPublisherId());
     }
 
     /** 返回Required。 */
@@ -446,6 +502,21 @@ public class LearningContentService {
             boolean includeProtectedBody,
             boolean hasAccess
     ) {
+        long viewCount = viewCountService.currentCount(
+                content.getId(),
+                valueOrZero(content.getViewCount())
+        );
+        return detail(content, includeProtectedBody, hasAccess, viewCount);
+    }
+
+    /** 组装详情并使用已经解析完成的浏览量，避免一次请求重复读取 Redis。 */
+    private ContentDetailResponse detail(
+            LearningContent content,
+            boolean includeProtectedBody,
+            boolean hasAccess,
+            long viewCount
+    ) {
+        content.setViewCount(viewCount);
         List<ContentFileResponse> files = fileMapper.findByContentId(content.getId()).stream()
                 .map(ContentFileResponse::from)
                 .toList();
@@ -502,5 +573,17 @@ public class LearningContentService {
     /** 执行 invalidState 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private BusinessException invalidState(String message) {
         return new BusinessException(ErrorCode.CONFLICT, message);
+    }
+
+    private void invalidateAuthorization(Long contentId) {
+        if (authorizationDecisionCache != null) {
+            authorizationDecisionCache.bumpContentAfterCommit(contentId);
+        }
+    }
+
+    private void invalidatePublicProfile(Long publisherId) {
+        if (publicUserProfileCache != null) {
+            publicUserProfileCache.evictAfterCommit(publisherId);
+        }
     }
 }

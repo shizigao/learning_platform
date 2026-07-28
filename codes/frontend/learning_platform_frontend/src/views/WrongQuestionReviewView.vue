@@ -153,8 +153,8 @@ onMounted(load)
           <div class="summary-cards">
             <div><span>最近考试</span><strong>{{ page.exams.length }}</strong></div>
             <div><span>错题总数</span><strong>{{ page.totalQuestionCount }}</strong></div>
-            <div><span>可供 AI 分析</span><strong>{{ page.analyzableQuestionCount }}</strong></div>
-            <div><span>AI 剩余次数</span><strong>{{ page.quotaRemaining }}</strong></div>
+            <div><span>可供 AI 分析的题目</span><strong>{{ page.analyzableQuestionCount }}</strong></div>
+            <div><span>AI学习助手 剩余次数</span><strong>{{ page.quotaRemaining }}</strong></div>
           </div>
 
           <div v-if="statusText" class="operation-status" :class="{ generating }">

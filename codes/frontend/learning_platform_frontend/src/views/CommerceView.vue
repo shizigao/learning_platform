@@ -85,8 +85,8 @@ const productTypeLabels: Record<ProductType, string> = {
   EXAM_PERSONAL_AI_PACKAGE: '考试个人 AI 分析次数包',
 }
 const orderStatusLabels: Record<OrderStatus, string> = {
-  PENDING_PAYMENT: '待模拟支付',
-  PAID: '模拟支付成功',
+  PENDING_PAYMENT: '待支付',
+  PAID: '支付成功',
   CANCELLED: '已取消',
   CLOSED: '已关闭',
   REFUNDED: '已退款',
@@ -180,8 +180,8 @@ async function buy(product: Product): Promise<void> {
   const total = Number(product.price) * quantity
   try {
     await ElMessageBox.confirm(
-      `将创建金额为 ${money(total)} 的测试订单。此处不会调用真实支付渠道，也不会产生真实扣款。`,
-      '创建模拟支付订单',
+      `将创建金额为 ${money(total)} 的订单。`,
+      '创建支付订单',
       {
         confirmButtonText: '确认创建',
         cancelButtonText: '取消',
@@ -190,7 +190,7 @@ async function buy(product: Product): Promise<void> {
     )
     creatingId.value = product.id
     await createOrder(product.id, quantity)
-    ElMessage.success('测试订单已创建，请在“我的订单”中进行模拟支付')
+    ElMessage.success('订单已创建，请在“我的订单”中进行支付')
     activeTab.value = 'orders'
     orderFilters.pageNumber = 1
     await loadOrders()
@@ -204,10 +204,10 @@ async function buy(product: Product): Promise<void> {
 async function pay(order: Order): Promise<void> {
   try {
     await ElMessageBox.confirm(
-      `本次仅模拟支付 ${money(order.payableAmount)}，不会跳转第三方渠道，也不会产生真实资金交易。`,
-      '模拟支付确认',
+      `本次支付 ${money(order.payableAmount)}`,
+      '支付确认',
       {
-        confirmButtonText: '确认模拟支付',
+        confirmButtonText: '确认支付',
         cancelButtonText: '取消',
         type: 'warning',
       },
@@ -217,7 +217,7 @@ async function pay(order: Order): Promise<void> {
     ElMessage.success(result.notice)
     await Promise.all([loadOrders(), loadEntitlements()])
   } catch (error) {
-    if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '模拟支付失败')
+    if (error !== 'cancel') ElMessage.error(error instanceof Error ? error.message : '支付失败')
   } finally {
     payingId.value = undefined
   }
@@ -256,14 +256,14 @@ onMounted(() => Promise.all([loadProducts(), loadOrders(), loadEntitlements()]))
         description="购买学习资料、AI 次数和考试发布次数，并集中查看测试订单与权益余额"
       />
 
-      <el-alert
+      <!-- <el-alert
         class="mock-alert"
         title="当前为模拟支付环境"
         description="所有价格、订单和支付按钮仅用于功能测试，不连接真实支付渠道，不会产生真实资金交易。"
         type="warning"
         show-icon
         :closable="false"
-      />
+      /> -->
 
       <div class="commerce-card">
         <el-tabs v-model="activeTab">
@@ -311,28 +311,28 @@ onMounted(() => Promise.all([loadProducts(), loadOrders(), loadEntitlements()]))
                   :loading="creatingId === product.id"
                   @click="buy(product)"
                 >
-                  {{ ownsContent(product) ? '已拥有该资料' : '创建测试订单' }}
+                  {{ ownsContent(product) ? '已拥有该资料' : '创建订单' }}
                 </el-button>
                 <small v-if="ownsContent(product)" class="owned-note">
                   该资料已在“我的权益”中，无需再次购买
                 </small>
-                <small v-else>后续仅进行模拟支付，不会真实扣款</small>
+                
               </article>
               <el-empty v-if="!productsLoading && visibleProducts.length === 0" description="暂无在售商品" />
             </div>
           </el-tab-pane>
 
           <el-tab-pane label="我的订单" name="orders">
-            <el-alert
+            <!-- <el-alert
               title="订单中的“支付”均指模拟支付"
               type="warning"
               show-icon
               :closable="false"
-            />
+            /> -->
             <div class="order-toolbar">
               <el-select v-model="orderFilters.status" clearable placeholder="全部订单状态">
-                <el-option label="待模拟支付" value="PENDING_PAYMENT" />
-                <el-option label="模拟支付成功" value="PAID" />
+                <el-option label="待支付" value="PENDING_PAYMENT" />
+                <el-option label="支付成功" value="PAID" />
                 <el-option label="已取消" value="CANCELLED" />
                 <el-option label="已关闭" value="CLOSED" />
                 <el-option label="已退款" value="REFUNDED" />
@@ -358,7 +358,7 @@ onMounted(() => Promise.all([loadProducts(), loadOrders(), loadEntitlements()]))
                   </div>
                 </div>
                 <footer>
-                  <span>应付（模拟）：<strong>{{ money(order.payableAmount) }}</strong></span>
+                  <span>应付：<strong>{{ money(order.payableAmount) }}</strong></span>
                   <div v-if="order.status === 'PENDING_PAYMENT'">
                     <el-button
                       :loading="cancellingId === order.id"
@@ -371,12 +371,12 @@ onMounted(() => Promise.all([loadProducts(), loadOrders(), loadEntitlements()]))
                       :loading="payingId === order.id"
                       @click="pay(order)"
                     >
-                      模拟支付（不真实扣款）
+                      支付
                     </el-button>
                   </div>
-                  <span v-else-if="order.status === 'PAID'" class="paid-note">
+                  <!-- <span v-else-if="order.status === 'PAID'" class="paid-note">
                     已完成模拟支付 · 不代表真实交易
-                  </span>
+                  </span> -->
                 </footer>
               </article>
               <el-empty v-if="!ordersLoading && orders.length === 0" description="暂无订单" />

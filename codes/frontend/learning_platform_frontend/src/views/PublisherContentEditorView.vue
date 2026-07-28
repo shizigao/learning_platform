@@ -243,7 +243,7 @@ onMounted(load)
 
 <template>
   <section v-loading="loading" class="editor-page"><div class="page-container">
-    <SectionPageHeader eyebrow="CONTENT EDITOR" :title="contentId ? '编辑学习资料' : '新建学习资料'" description="完善内容信息并上传经过安全校验的资料文件">
+    <SectionPageHeader eyebrow="CONTENT EDITOR" :title="contentId ? '编辑学习资料' : '新建学习资料'" description="完善内容信息并上传资料文件">
       <ContentStatusTag v-if="detail" :status="detail.status" />
       <RouterLink to="/publisher"><el-button>返回工作台</el-button></RouterLink>
       <el-button type="primary" :loading="saving" :disabled="!editable" @click="save">保存草稿</el-button>
@@ -303,7 +303,7 @@ onMounted(load)
           </el-form-item>
         </div>
         <el-form-item label="资料简介"><el-input v-model="form.summary" maxlength="1000" :rows="3" show-word-limit type="textarea" /></el-form-item>
-        <el-form-item label="资料正文（Markdown）">
+        <el-form-item label="资料正文（支持Markdown）">
           <MarkdownEditor
             ref="markdownEditor"
             v-model="form.articleBody"

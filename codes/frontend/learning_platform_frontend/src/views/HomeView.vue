@@ -91,7 +91,7 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div class="hero-panel" aria-label="平台能力预览">
-        <div class="panel-heading"><span>平台能力概览</span><el-tag type="success" effect="light" round>核心功能已开放</el-tag></div>
+        <!-- <div class="panel-heading"><span>平台能力概览</span><el-tag type="success" effect="light" round>核心功能已开放</el-tag></div> -->
         <div class="feature-grid">
           <article><span class="feature-icon blue"><Document /></span><strong>学习资料</strong><small>图文、文档与视频</small></article>
           <article><span class="feature-icon purple"><MagicStick /></span><strong>AI 助手</strong><small>总结与知识讲解</small></article>
@@ -138,7 +138,7 @@ onBeforeUnmount(() => {
   <section class="capability-section">
     <div class="page-container section-heading">
       <div><span>核心能力</span><h2>一个平台，完成学习全过程</h2></div>
-      <p>学习资料、在线考试、AI 助手、班级与错题复习等主要功能已经开放使用。</p>
+      <p>版本更新说明：<br>v1.3：增加了班级功能与错题复习功能</p>
     </div>
   </section>
 </template>

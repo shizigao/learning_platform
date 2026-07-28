@@ -7,6 +7,7 @@ package com.learningplatform.content.service;
 import com.learningplatform.common.api.ErrorCode;
 import com.learningplatform.common.exception.BusinessException;
 import com.learningplatform.common.page.PageResult;
+import com.learningplatform.common.redis.RedisJsonCache;
 import com.learningplatform.content.domain.ContentCategory;
 import com.learningplatform.content.dto.CategoryWriteRequest;
 import com.learningplatform.content.dto.ContentCategoryResponse;
@@ -17,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Locale;
+import java.time.Duration;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 @Service
 /**
@@ -25,19 +28,33 @@ import java.util.Locale;
  * <p>职责边界：业务状态变化在此集中完成；跨表写入需保持事务一致性。</p>
  */
 public class ContentCategoryService {
+    private static final String ENABLED_CACHE_KEY = "lp:v1:content:categories:enabled";
+    private static final TypeReference<List<ContentCategoryResponse>> CATEGORY_LIST_TYPE =
+            new TypeReference<>() {
+            };
     /** 访问分类持久化数据。 */
     private final ContentCategoryMapper categoryMapper;
+    private final RedisJsonCache redisJsonCache;
 
     /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
-    public ContentCategoryService(ContentCategoryMapper categoryMapper) {
+    public ContentCategoryService(
+            ContentCategoryMapper categoryMapper,
+            RedisJsonCache redisJsonCache
+    ) {
         this.categoryMapper = categoryMapper;
+        this.redisJsonCache = redisJsonCache;
     }
 
     /** 查询启用状态相关数据；只返回当前调用方有权查看的结果。 */
     public List<ContentCategoryResponse> listEnabled() {
-        return categoryMapper.findAllEnabled().stream()
-                .map(ContentCategoryResponse::from)
-                .toList();
+        return redisJsonCache.get(
+                ENABLED_CACHE_KEY,
+                CATEGORY_LIST_TYPE,
+                Duration.ofMinutes(30),
+                () -> categoryMapper.findAllEnabled().stream()
+                        .map(ContentCategoryResponse::from)
+                        .toList()
+        );
     }
 
     /** 查询All相关数据；只返回当前调用方有权查看的结果。 */
@@ -85,6 +102,7 @@ public class ContentCategoryService {
         if (categoryMapper.insert(category) != 1) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "创建资料分类失败");
         }
+        redisJsonCache.evictAfterCommit(ENABLED_CACHE_KEY);
         return ContentCategoryResponse.from(category);
     }
 
@@ -98,6 +116,7 @@ public class ContentCategoryService {
         if (categoryMapper.update(category) != 1) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "资料分类不存在");
         }
+        redisJsonCache.evictAfterCommit(ENABLED_CACHE_KEY);
         return ContentCategoryResponse.from(getRequired(id));
     }
 
@@ -108,6 +127,7 @@ public class ContentCategoryService {
         if (categoryMapper.softDelete(id) != 1) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "资料分类不存在");
         }
+        redisJsonCache.evictAfterCommit(ENABLED_CACHE_KEY);
     }
 
     /** 执行 buildCategory 对应的领域用例，并在服务层维护权限、事务和状态约束。 */

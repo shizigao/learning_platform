@@ -168,7 +168,7 @@ onMounted(load)
         <aside class="action-card">
           <div class="price">{{ priceText }}</div>
           <p>
-            {{ detail.hasAccess ? '你已获得该资料的学习权限' : '可前往权益商城创建测试订单并进行模拟支付，不会真实扣款' }}
+            {{ detail.hasAccess ? '你已获得该资料的学习权限' : '可前往权益商城创建订单并进行支付' }}
           </p>
           <el-button
             v-if="detail.hasAccess"

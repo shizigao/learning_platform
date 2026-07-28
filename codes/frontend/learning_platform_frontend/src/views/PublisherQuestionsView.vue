@@ -363,7 +363,7 @@ onMounted(async () => {
       <SectionPageHeader
         eyebrow="QUESTION BANK"
         title="题库管理"
-        description="维护五类题目、标准答案和解析，题目数据仅对所属发布者开放"
+        description="创建题目、标准答案和解析"
       >
         <el-button @click="openBank()">新建题库</el-button>
         <el-button :disabled="banks.length === 0" @click="bankPickerVisible = true">选择题库</el-button>

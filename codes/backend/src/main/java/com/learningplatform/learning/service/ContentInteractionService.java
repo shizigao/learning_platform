@@ -24,6 +24,7 @@ import com.learningplatform.learning.mapper.ContentInteractionMapper;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.learningplatform.user.service.PublicUserProfileCache;
 
 import java.util.List;
 
@@ -44,6 +45,7 @@ public class ContentInteractionService {
     private final ContentAccessService accessService;
     /** 委托学习资料执行对应领域规则。 */
     private final LearningContentService contentService;
+    private final PublicUserProfileCache publicUserProfileCache;
 
     /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public ContentInteractionService(
@@ -51,13 +53,15 @@ public class ContentInteractionService {
             ContentInteractionMapper interactionMapper,
             ContentCommentMapper commentMapper,
             ContentAccessService accessService,
-            LearningContentService contentService
+            LearningContentService contentService,
+            PublicUserProfileCache publicUserProfileCache
     ) {
         this.contentMapper = contentMapper;
         this.interactionMapper = interactionMapper;
         this.commentMapper = commentMapper;
         this.accessService = accessService;
         this.contentService = contentService;
+        this.publicUserProfileCache = publicUserProfileCache;
     }
 
     /** 执行 state 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
@@ -96,6 +100,7 @@ public class ContentInteractionService {
             throw new BusinessException(ErrorCode.NOT_FOUND, "学习资料不存在或尚未发布");
         }
         content.setLikeCount(valueOrZero(content.getLikeCount()) + 1);
+        publicUserProfileCache.evictAfterCommit(content.getPublisherId());
         return response(content, userId);
     }
 
@@ -112,6 +117,7 @@ public class ContentInteractionService {
         }
         contentMapper.decrementLikeCount(contentId);
         content.setLikeCount(Math.max(valueOrZero(content.getLikeCount()) - 1, 0));
+        publicUserProfileCache.evictAfterCommit(content.getPublisherId());
         return response(content, userId);
     }
 
@@ -135,6 +141,7 @@ public class ContentInteractionService {
             throw new BusinessException(ErrorCode.NOT_FOUND, "学习资料不存在或尚未发布");
         }
         content.setFavoriteCount(valueOrZero(content.getFavoriteCount()) + 1);
+        publicUserProfileCache.evictAfterCommit(content.getPublisherId());
         return response(content, userId);
     }
 
@@ -151,6 +158,7 @@ public class ContentInteractionService {
         }
         contentMapper.decrementFavoriteCount(contentId);
         content.setFavoriteCount(Math.max(valueOrZero(content.getFavoriteCount()) - 1, 0));
+        publicUserProfileCache.evictAfterCommit(content.getPublisherId());
         return response(content, userId);
     }
 

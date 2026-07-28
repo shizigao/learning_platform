@@ -6,6 +6,7 @@ package com.learningplatform.user.service;
 
 import com.learningplatform.common.api.ErrorCode;
 import com.learningplatform.common.exception.BusinessException;
+import com.learningplatform.auth.security.AuthSnapshotCache;
 import com.learningplatform.user.domain.Role;
 import com.learningplatform.user.domain.RoleCode;
 import com.learningplatform.user.domain.UserRole;
@@ -31,16 +32,22 @@ public class RoleService {
     private final RoleMapper roleMapper;
     /** 访问用户角色持久化数据。 */
     private final UserRoleMapper userRoleMapper;
+    private final AuthSnapshotCache authSnapshotCache;
+    private final PublicUserProfileCache publicUserProfileCache;
 
     /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public RoleService(
             UserService userService,
             RoleMapper roleMapper,
-            UserRoleMapper userRoleMapper
+            UserRoleMapper userRoleMapper,
+            AuthSnapshotCache authSnapshotCache,
+            PublicUserProfileCache publicUserProfileCache
     ) {
         this.userService = userService;
         this.roleMapper = roleMapper;
         this.userRoleMapper = userRoleMapper;
+        this.authSnapshotCache = authSnapshotCache;
+        this.publicUserProfileCache = publicUserProfileCache;
     }
 
     /** 查询Roles按用户ID相关数据；只返回当前调用方有权查看的结果。 */
@@ -68,14 +75,24 @@ public class RoleService {
         userRole.setUserId(userId);
         userRole.setRoleId(role.getId());
         userRole.setGrantedBy(grantedBy);
-        return userRoleMapper.insert(userRole) == 1;
+        boolean inserted = userRoleMapper.insert(userRole) == 1;
+        if (inserted) {
+            authSnapshotCache.evictAfterCommit(userId);
+            publicUserProfileCache.evictAfterCommit(userId);
+        }
+        return inserted;
     }
 
     @Transactional
     /** 删除、移除或清理角色，同时维护关联数据和权限不变量。 */
     public boolean removeRole(Long userId, RoleCode roleCode) {
         Role role = getRequiredRole(roleCode);
-        return userRoleMapper.delete(userId, role.getId()) == 1;
+        boolean deleted = userRoleMapper.delete(userId, role.getId()) == 1;
+        if (deleted) {
+            authSnapshotCache.evictAfterCommit(userId);
+            publicUserProfileCache.evictAfterCommit(userId);
+        }
+        return deleted;
     }
 
     /** 返回Required角色。 */

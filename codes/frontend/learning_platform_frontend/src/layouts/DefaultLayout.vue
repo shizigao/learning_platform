@@ -104,7 +104,7 @@ async function handleUserCommand(command: string): Promise<void> {
     <main class="app-main"><RouterView /></main>
     <footer class="app-footer">
       <div class="page-container footer-inner">
-        <span>智能在线学习考试平台</span><span>MVP 开发环境</span>
+        <span>智能在线学习考试平台</span><span>版本：v1.3</span>
       </div>
     </footer>
   </div>

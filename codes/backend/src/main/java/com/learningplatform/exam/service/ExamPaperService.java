@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.learningplatform.common.api.ErrorCode;
 import com.learningplatform.common.exception.BusinessException;
 import com.learningplatform.common.page.PageResult;
+import com.learningplatform.common.redis.RedisJsonCache;
 import com.learningplatform.exam.domain.ExamPaper;
 import com.learningplatform.exam.domain.ExamPaperQuestion;
 import com.learningplatform.exam.domain.ExamPaperStatus;
@@ -35,6 +36,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.time.Duration;
 
 @Service
 /**
@@ -48,6 +50,9 @@ public class ExamPaperService {
     private static final TypeReference<List<QuestionOptionResponse>> OPTION_LIST_TYPE =
             new TypeReference<>() {
             };
+    private static final TypeReference<List<CandidatePaperQuestionResponse>>
+            CANDIDATE_QUESTION_LIST_TYPE = new TypeReference<>() {
+            };
 
     /** 访问试卷持久化数据。 */
     private final ExamPaperMapper paperMapper;
@@ -57,18 +62,21 @@ public class ExamPaperService {
     private final QuestionService questionService;
     /** 访问object持久化数据。 */
     private final ObjectMapper objectMapper;
+    private final RedisJsonCache redisJsonCache;
 
     /** 注入并保存该组件运行所需依赖，不在构造阶段执行业务操作。 */
     public ExamPaperService(
             ExamPaperMapper paperMapper,
             ExamPaperQuestionMapper paperQuestionMapper,
             QuestionService questionService,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            RedisJsonCache redisJsonCache
     ) {
         this.paperMapper = paperMapper;
         this.paperQuestionMapper = paperQuestionMapper;
         this.questionService = questionService;
         this.objectMapper = objectMapper;
+        this.redisJsonCache = redisJsonCache;
     }
 
     /** 查询目标相关数据；只返回当前调用方有权查看的结果。 */
@@ -175,6 +183,7 @@ public class ExamPaperService {
         ) != 1) {
             throw invalidState("当前试卷不能重新组卷");
         }
+        redisJsonCache.evictAfterCommit(candidateQuestionCacheKey(paperId));
         return detail(paperId, requesterId, requesterAdmin);
     }
 
@@ -196,20 +205,25 @@ public class ExamPaperService {
     /** 判断是否满足didateQuestions条件，不修改持久化状态。 */
     public List<CandidatePaperQuestionResponse> candidateQuestions(Long paperId) {
         getRequired(paperId);
-        return paperQuestionMapper.findByPaperId(paperId).stream()
-                .map(question -> new CandidatePaperQuestionResponse(
-                        question.getId(),
-                        question.getQuestionId(),
-                        question.getSortOrder(),
-                        question.getScore(),
-                        question.getQuestionTypeSnapshot(),
-                        question.getStemSnapshot(),
-                        readOptions(question.getOptionsSnapshot()),
-                        question.getQuestionTypeSnapshot() == com.learningplatform.question.domain.QuestionType.FILL_BLANK
-                                ? readAnswer(question.getAnswerSnapshot()).acceptedAnswers().size()
-                                : 0
-                ))
-                .toList();
+        return redisJsonCache.get(
+                candidateQuestionCacheKey(paperId),
+                CANDIDATE_QUESTION_LIST_TYPE,
+                Duration.ofMinutes(30),
+                () -> paperQuestionMapper.findByPaperId(paperId).stream()
+                        .map(question -> new CandidatePaperQuestionResponse(
+                                question.getId(),
+                                question.getQuestionId(),
+                                question.getSortOrder(),
+                                question.getScore(),
+                                question.getQuestionTypeSnapshot(),
+                                question.getStemSnapshot(),
+                                readOptions(question.getOptionsSnapshot()),
+                                question.getQuestionTypeSnapshot() == com.learningplatform.question.domain.QuestionType.FILL_BLANK
+                                        ? readAnswer(question.getAnswerSnapshot()).acceptedAnswers().size()
+                                        : 0
+                        ))
+                        .toList()
+        );
     }
 
     @Transactional
@@ -221,6 +235,7 @@ public class ExamPaperService {
         if (paperMapper.softDelete(paperId) != 1) {
             throw invalidState("当前试卷不能删除");
         }
+        redisJsonCache.evictAfterCommit(candidateQuestionCacheKey(paperId));
     }
 
     /** 返回Required。 */
@@ -335,5 +350,9 @@ public class ExamPaperService {
     /** 执行 invalidState 对应的领域用例，并在服务层维护权限、事务和状态约束。 */
     private BusinessException invalidState(String message) {
         return new BusinessException(ErrorCode.CONFLICT, message);
+    }
+
+    private String candidateQuestionCacheKey(Long paperId) {
+        return "lp:v1:exam:paper:candidate:" + paperId;
     }
 }
