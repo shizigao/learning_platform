@@ -1,0 +1,100 @@
+@startuml
+title 智学云考——系统概要用例图
+
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam linetype ortho
+skinparam ArrowColor #64748B
+skinparam ActorBorderColor #2563EB
+skinparam ActorFontColor #0F172A
+skinparam UsecaseBorderColor #3B82F6
+skinparam UsecaseBackgroundColor #EFF6FF
+skinparam UsecaseFontColor #0F172A
+skinparam PackageBorderColor #94A3B8
+skinparam PackageFontColor #1E3A8A
+
+actor "游客" as Guest
+actor "普通用户" as User
+actor "发布者" as Publisher
+actor "系统管理员" as Admin
+
+Publisher --|> User
+Admin --|> Publisher
+
+rectangle "智学云考平台" {
+  package "账户与学习" {
+    usecase "注册/登录" as UC_Auth
+    usecase "管理个人资料与头像" as UC_Profile
+    usecase "浏览与搜索学习资料" as UC_Browse
+    usecase "学习资料并记录进度" as UC_Learn
+    usecase "点赞、收藏与评论" as UC_Interact
+    usecase "查看用户公开主页" as UC_PublicProfile
+  }
+
+  package "班级、考试与权益" {
+    usecase "加入并查看班级" as UC_JoinClass
+    usecase "参加考试并查看成绩" as UC_TakeExam
+    usecase "复习错题" as UC_WrongReview
+    usecase "购买资料与功能权益" as UC_Buy
+    usecase "使用 AI 学习与分析" as UC_AI
+    usecase "寻找线下教师" as UC_FindTeacher
+  }
+
+  package "内容发布与教学管理" {
+    usecase "创建和发布学习资料" as UC_PublishContent
+    usecase "创建并管理班级" as UC_ManageClass
+    usecase "管理题库与试卷" as UC_QuestionPaper
+    usecase "创建和发布考试" as UC_PublishExam
+    usecase "阅卷、统计与考试分析" as UC_Grade
+    usecase "申请成为线下教师" as UC_ApplyTeacher
+  }
+
+  package "平台治理" {
+    usecase "管理用户与角色" as UC_ManageUsers
+    usecase "管理资料分类" as UC_Category
+    usecase "审核和管理学习资料" as UC_AuditContent
+    usecase "监管考试与订单" as UC_Monitor
+    usecase "审核线下教师" as UC_AuditTeacher
+    usecase "查看 AI 配置与操作日志" as UC_System
+  }
+}
+
+Guest --> UC_Auth
+
+User --> UC_Profile
+User --> UC_Browse
+User --> UC_Learn
+User --> UC_Interact
+User --> UC_PublicProfile
+User --> UC_JoinClass
+User --> UC_TakeExam
+User --> UC_WrongReview
+User --> UC_Buy
+User --> UC_AI
+User --> UC_FindTeacher
+
+Publisher --> UC_PublishContent
+Publisher --> UC_ManageClass
+Publisher --> UC_QuestionPaper
+Publisher --> UC_PublishExam
+Publisher --> UC_Grade
+Publisher --> UC_ApplyTeacher
+
+Admin --> UC_ManageUsers
+Admin --> UC_Category
+Admin --> UC_AuditContent
+Admin --> UC_Monitor
+Admin --> UC_AuditTeacher
+Admin --> UC_System
+
+note bottom of Publisher
+  发布者继承普通用户的全部功能
+end note
+
+note bottom of Admin
+  系统管理员继承发布者和普通用户的全部功能
+end note
+
+@enduml

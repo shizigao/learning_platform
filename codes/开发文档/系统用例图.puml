@@ -1,0 +1,381 @@
+@startuml
+title 智学云考——系统用例图
+
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam linetype ortho
+skinparam ArrowColor #64748B
+skinparam ActorBorderColor #2563EB
+skinparam ActorFontColor #0F172A
+skinparam UsecaseBorderColor #3B82F6
+skinparam UsecaseBackgroundColor #EFF6FF
+skinparam UsecaseFontColor #0F172A
+skinparam PackageBorderColor #94A3B8
+skinparam PackageFontColor #1E3A8A
+skinparam NoteBackgroundColor #FFF7ED
+skinparam NoteBorderColor #FB923C
+
+actor "游客" as Guest
+actor "普通用户\nUSER" as User
+actor "发布者\nPUBLISHER" as Publisher
+actor "系统管理员\nADMIN" as Admin
+
+actor "班级成员\n（班内身份）" as ClassMember
+actor "班级管理员\n（班内身份）" as ClassManager
+actor "班级拥有者\n（班内身份）" as ClassOwner
+
+actor "AI 服务\nDeepSeek / Mock" as AIProvider
+actor "对象存储\nMinIO" as ObjectStorage
+
+Publisher --|> User
+Admin --|> Publisher
+ClassMember --|> User
+ClassManager --|> ClassMember
+ClassOwner --|> ClassManager
+
+rectangle "智学云考平台" {
+
+  package "身份、账户与个人中心" {
+    usecase "注册账户" as UC_Register
+    usecase "登录系统" as UC_Login
+    usecase "退出登录" as UC_Logout
+    usecase "查看/修改个人资料" as UC_Profile
+    usecase "上传/更换/删除头像" as UC_Avatar
+    usecase "搜索用户" as UC_SearchUser
+    usecase "查看公开个人中心" as UC_PublicProfile
+    usecase "查看用户公开资料与\n浏览/点赞/收藏统计" as UC_PublicStats
+  }
+
+  package "学习资料与学习行为" {
+    usecase "搜索/筛选资料分类" as UC_SearchCategory
+    usecase "搜索/浏览学习资料" as UC_BrowseContent
+    usecase "查看资料详情与封面" as UC_ContentDetail
+    usecase "校验资料访问权限" as UC_ContentAccess
+    usecase "预览/下载资料文件" as UC_ContentFile
+    usecase "跳转被引用资料" as UC_FollowReference
+    usecase "购买付费资料访问权" as UC_BuyContent
+    usecase "开始学习" as UC_StartLearning
+    usecase "记录/调整学习进度" as UC_Progress
+    usecase "应用当前阅读位置" as UC_ApplyCurrentProgress
+    usecase "点赞/取消点赞" as UC_Like
+    usecase "收藏/取消收藏" as UC_Favorite
+    usecase "发布/查看评论" as UC_Comment
+    usecase "查看我的学习与收藏" as UC_MyLearning
+  }
+
+  package "发布者资料管理" {
+    usecase "查看自有资料" as UC_OwnContents
+    usecase "新建/编辑资料草稿" as UC_EditContent
+    usecase "选择资料分类" as UC_SelectCategory
+    usecase "编辑 Markdown 正文" as UC_EditMarkdown
+    usecase "上传封面、图片和附件" as UC_UploadContentFile
+    usecase "搜索并插入资料引用" as UC_InsertReference
+    usecase "设置公开/班级发放范围" as UC_ContentScope
+    usecase "设置免费/付费访问" as UC_ContentPricing
+    usecase "提交资料审核" as UC_SubmitContent
+    usecase "删除自有资料" as UC_DeleteContent
+  }
+
+  package "班级" {
+    usecase "查看我的班级" as UC_MyClasses
+    usecase "使用邀请码加入班级" as UC_JoinClass
+    usecase "查看班级详情与成员" as UC_ClassDetail
+    usecase "查看班级公告" as UC_ViewAnnouncement
+    usecase "查看班级资料与考试" as UC_ClassResources
+    usecase "退出班级" as UC_LeaveClass
+
+    usecase "创建班级" as UC_CreateClass
+    usecase "编辑班级信息" as UC_EditClass
+    usecase "生成/停用/重置邀请码" as UC_InviteCode
+    usecase "发布/编辑/置顶/删除公告" as UC_ManageAnnouncement
+    usecase "移除/恢复班级成员" as UC_ManageMember
+    usecase "授予/撤销管理员权限" as UC_ManageClassAdmin
+    usecase "转让班级所有权" as UC_TransferClass
+    usecase "解散班级" as UC_DeleteClass
+  }
+
+  package "题库、试卷与考试发布" {
+    usecase "选择当前题库" as UC_SelectBank
+    usecase "新建/修改/删除题库" as UC_ManageBank
+    usecase "新建/修改/删除题目" as UC_ManageQuestion
+    usecase "维护五类题型、选项与答案" as UC_QuestionTypes
+    usecase "新建/修改/删除试卷" as UC_ManagePaper
+    usecase "按题库选择试题" as UC_SelectQuestions
+    usecase "设置题目顺序与分值" as UC_PaperScore
+    usecase "新建/修改/删除考试" as UC_ManageExam
+    usecase "搜索并选择试卷" as UC_SelectPaper
+    usecase "指定考生或指定班级" as UC_ExamScope
+    usecase "发布考试" as UC_PublishExam
+    usecase "取消考试" as UC_CancelExam
+  }
+
+  package "参加考试、阅卷与成绩" {
+    usecase "查看被分配的考试" as UC_AssignedExams
+    usecase "检查考试资格与时间" as UC_ExamEligibility
+    usecase "开始/恢复考试" as UC_StartExam
+    usecase "保存单题/批量答案" as UC_SaveAnswers
+    usecase "主动提交试卷" as UC_SubmitExam
+    usecase "超时自动交卷" as UC_AutoSubmit
+    usecase "客观题自动评分" as UC_AutoGrade
+    usecase "查看考试成绩与逐题结果" as UC_ExamResult
+    usecase "查看待阅卷答卷" as UC_GradingList
+    usecase "评阅主观题并填写评语" as UC_ManualGrade
+    usecase "确认最终成绩" as UC_FinalizeGrade
+    usecase "查看考试统计" as UC_ExamStats
+    usecase "复习最近五场考试错题" as UC_WrongReview
+  }
+
+  package "商品、订单与权益" {
+    usecase "浏览商品与权益包" as UC_Products
+    usecase "创建订单" as UC_CreateOrder
+    usecase "查看本人订单" as UC_ViewOrders
+    usecase "取消待支付订单" as UC_CancelOrder
+    usecase "模拟支付" as UC_MockPay
+    usecase "发放资料权或功能次数" as UC_GrantEntitlement
+    usecase "查看资料权与剩余次数" as UC_Entitlements
+    usecase "校验功能额度" as UC_CheckQuota
+    usecase "成功后扣减额度" as UC_ConsumeQuota
+  }
+
+  package "AI 学习与分析" {
+    usecase "生成资料总结" as UC_AISummary
+    usecase "新建资料讲解会话" as UC_AIConversation
+    usecase "连续提问并获取讲解" as UC_AIQuestion
+    usecase "使用“出题巩固”模板" as UC_AIQuiz
+    usecase "使用“发散思维”模板" as UC_AIDivergent
+    usecase "生成个人考试分析" as UC_AIPersonalExam
+    usecase "生成考试整体分析" as UC_AIOverallExam
+    usecase "AI 分析错题" as UC_AIWrongQuestion
+    usecase "查看 AI 任务、历史报告\n与额度记录" as UC_AIHistory
+    usecase "构造脱敏业务上下文" as UC_BuildAIContext
+    usecase "调用 AI 模型" as UC_CallAI
+    usecase "保存 AI 结果" as UC_SaveAIResult
+  }
+
+  package "线下教学" {
+    usecase "搜索/筛选已审核教师" as UC_SearchTeacher
+    usecase "查看教师详情与联系方式" as UC_TeacherDetail
+    usecase "进入教师公开主页" as UC_TeacherProfile
+    usecase "填写学习需求与偏好" as UC_StudentPreference
+    usecase "本地初筛至多 20 名教师" as UC_LocalTeacherMatch
+    usecase "AI 推荐至多 3 名教师" as UC_AIRecommendTeacher
+
+    usecase "填写/修改教师信息" as UC_TeacherApplication
+    usecase "填写可上课时间" as UC_TeacherAvailability
+    usecase "提交教师认证申请" as UC_SubmitTeacherApplication
+    usecase "查看申请状态" as UC_TeacherApplicationStatus
+  }
+
+  package "系统管理与治理" {
+    usecase "查询用户" as UC_AdminUsers
+    usecase "启用/禁用用户" as UC_UserStatus
+    usecase "分配/撤销系统角色" as UC_UserRoles
+    usecase "管理资料分类" as UC_AdminCategories
+    usecase "审核/驳回/下架/重新发布资料" as UC_AuditContent
+    usecase "监管考试" as UC_AdminExams
+    usecase "监管订单" as UC_AdminOrders
+    usecase "审核/驳回教师申请" as UC_AuditTeacher
+    usecase "暂停/恢复教师展示" as UC_TeacherStatus
+    usecase "查看脱敏 AI 配置" as UC_AIConfig
+    usecase "查看操作审计日志" as UC_AuditLogs
+  }
+}
+
+' 身份与账户
+Guest --> UC_Register
+Guest --> UC_Login
+User --> UC_Logout
+User --> UC_Profile
+User --> UC_Avatar
+User --> UC_SearchUser
+User --> UC_PublicProfile
+UC_PublicProfile ..> UC_PublicStats : <<include>>
+UC_Avatar --> ObjectStorage : 存储/读取头像
+
+' 学习资料
+User --> UC_SearchCategory
+User --> UC_BrowseContent
+User --> UC_ContentDetail
+User --> UC_ContentFile
+User --> UC_FollowReference
+User --> UC_StartLearning
+User --> UC_Progress
+User --> UC_Like
+User --> UC_Favorite
+User --> UC_Comment
+User --> UC_MyLearning
+User --> UC_BuyContent
+UC_ContentDetail ..> UC_ContentAccess : <<include>>
+UC_ContentFile ..> UC_ContentAccess : <<include>>
+UC_StartLearning ..> UC_ContentAccess : <<include>>
+UC_FollowReference ..> UC_ContentAccess : <<include>>
+UC_ApplyCurrentProgress ..> UC_Progress : <<extend>>
+UC_BuyContent ..> UC_CreateOrder : <<include>>
+UC_ContentFile --> ObjectStorage : 获取签名地址
+
+' 发布者资料管理
+Publisher --> UC_OwnContents
+Publisher --> UC_EditContent
+Publisher --> UC_DeleteContent
+Publisher --> UC_SubmitContent
+UC_EditContent ..> UC_SelectCategory : <<include>>
+UC_EditContent ..> UC_EditMarkdown : <<include>>
+UC_EditContent ..> UC_UploadContentFile : <<include>>
+UC_EditContent ..> UC_InsertReference : <<include>>
+UC_EditContent ..> UC_ContentScope : <<include>>
+UC_EditContent ..> UC_ContentPricing : <<include>>
+UC_UploadContentFile --> ObjectStorage : 存储资料文件
+
+' 班级
+User --> UC_MyClasses
+User --> UC_JoinClass
+ClassMember --> UC_ClassDetail
+ClassMember --> UC_ViewAnnouncement
+ClassMember --> UC_ClassResources
+ClassMember --> UC_LeaveClass
+Publisher --> UC_CreateClass
+UC_CreateClass ..> UC_InviteCode : <<include>>
+ClassManager --> UC_ManageAnnouncement
+ClassManager --> UC_ManageMember
+ClassOwner --> UC_EditClass
+ClassOwner --> UC_InviteCode
+ClassOwner --> UC_ManageClassAdmin
+ClassOwner --> UC_TransferClass
+ClassOwner --> UC_DeleteClass
+
+' 题库、试卷、考试
+Publisher --> UC_SelectBank
+Publisher --> UC_ManageBank
+Publisher --> UC_ManageQuestion
+Publisher --> UC_ManagePaper
+Publisher --> UC_ManageExam
+Publisher --> UC_PublishExam
+Publisher --> UC_CancelExam
+UC_ManageQuestion ..> UC_SelectBank : <<include>>
+UC_ManageQuestion ..> UC_QuestionTypes : <<include>>
+UC_ManagePaper ..> UC_SelectQuestions : <<include>>
+UC_ManagePaper ..> UC_PaperScore : <<include>>
+UC_ManageExam ..> UC_SelectPaper : <<include>>
+UC_ManageExam ..> UC_ExamScope : <<include>>
+UC_PublishExam ..> UC_CheckQuota : <<include>>
+UC_PublishExam ..> UC_ConsumeQuota : <<include>>
+
+' 考生与阅卷
+User --> UC_AssignedExams
+User --> UC_StartExam
+User --> UC_SaveAnswers
+User --> UC_SubmitExam
+User --> UC_ExamResult
+User --> UC_WrongReview
+UC_StartExam ..> UC_ExamEligibility : <<include>>
+UC_AutoSubmit ..> UC_SubmitExam : <<extend>>
+UC_SubmitExam ..> UC_AutoGrade : <<include>>
+Publisher --> UC_GradingList
+Publisher --> UC_ManualGrade
+Publisher --> UC_FinalizeGrade
+Publisher --> UC_ExamStats
+UC_FinalizeGrade ..> UC_ManualGrade : <<include>>
+
+' 商品、订单、权益
+User --> UC_Products
+User --> UC_CreateOrder
+User --> UC_ViewOrders
+User --> UC_CancelOrder
+User --> UC_MockPay
+User --> UC_Entitlements
+UC_MockPay ..> UC_GrantEntitlement : <<include>>
+
+' AI
+User --> UC_AISummary
+User --> UC_AIConversation
+User --> UC_AIQuestion
+User --> UC_AIQuiz
+User --> UC_AIDivergent
+User --> UC_AIPersonalExam
+User --> UC_AIWrongQuestion
+User --> UC_AIHistory
+Publisher --> UC_AIOverallExam
+
+UC_AISummary ..> UC_ContentAccess : <<include>>
+UC_AIConversation ..> UC_ContentAccess : <<include>>
+UC_AIQuestion ..> UC_AIConversation : <<include>>
+UC_AIQuiz ..> UC_AIConversation : <<include>>
+UC_AIDivergent ..> UC_AIConversation : <<include>>
+UC_AIPersonalExam ..> UC_ExamResult : <<include>>
+UC_AIOverallExam ..> UC_ExamStats : <<include>>
+UC_AIWrongQuestion ..> UC_WrongReview : <<include>>
+
+UC_AISummary ..> UC_CheckQuota : <<include>>
+UC_AIQuestion ..> UC_CheckQuota : <<include>>
+UC_AIQuiz ..> UC_CheckQuota : <<include>>
+UC_AIDivergent ..> UC_CheckQuota : <<include>>
+UC_AIPersonalExam ..> UC_CheckQuota : <<include>>
+UC_AIOverallExam ..> UC_CheckQuota : <<include>>
+UC_AIWrongQuestion ..> UC_CheckQuota : <<include>>
+
+UC_AISummary ..> UC_BuildAIContext : <<include>>
+UC_AIQuestion ..> UC_BuildAIContext : <<include>>
+UC_AIQuiz ..> UC_BuildAIContext : <<include>>
+UC_AIDivergent ..> UC_BuildAIContext : <<include>>
+UC_AIPersonalExam ..> UC_BuildAIContext : <<include>>
+UC_AIOverallExam ..> UC_BuildAIContext : <<include>>
+UC_AIWrongQuestion ..> UC_BuildAIContext : <<include>>
+UC_BuildAIContext ..> UC_CallAI : <<include>>
+UC_CallAI --> AIProvider
+UC_SaveAIResult ..> UC_CallAI : <<extend>>\n[模型调用成功]
+UC_ConsumeQuota ..> UC_SaveAIResult : <<extend>>\n[成功持久化后]
+
+' 线下教学
+User --> UC_SearchTeacher
+User --> UC_TeacherDetail
+User --> UC_TeacherProfile
+User --> UC_StudentPreference
+User --> UC_AIRecommendTeacher
+UC_TeacherProfile ..> UC_PublicProfile : <<include>>
+UC_AIRecommendTeacher ..> UC_StudentPreference : <<include>>
+UC_AIRecommendTeacher ..> UC_LocalTeacherMatch : <<include>>
+UC_AIRecommendTeacher ..> UC_CheckQuota : <<include>>
+UC_AIRecommendTeacher ..> UC_BuildAIContext : <<include>>
+Publisher --> UC_TeacherApplication
+Publisher --> UC_SubmitTeacherApplication
+Publisher --> UC_TeacherApplicationStatus
+UC_TeacherApplication ..> UC_TeacherAvailability : <<include>>
+UC_SubmitTeacherApplication ..> UC_TeacherApplication : <<include>>
+
+' 管理后台
+Admin --> UC_AdminUsers
+Admin --> UC_UserStatus
+Admin --> UC_UserRoles
+Admin --> UC_AdminCategories
+Admin --> UC_AuditContent
+Admin --> UC_AdminExams
+Admin --> UC_AdminOrders
+Admin --> UC_AuditTeacher
+Admin --> UC_TeacherStatus
+Admin --> UC_AIConfig
+Admin --> UC_AuditLogs
+
+note right of Admin
+  管理员继承发布者和普通用户能力，
+  但考试整体 AI 分析仍要求其为
+  该场考试的实际发布者。
+end note
+
+note bottom of ClassOwner
+  班级身份按具体班级生效，
+  不等同于系统 ADMIN 角色。
+end note
+
+note bottom of UC_MockPay
+  当前为模拟支付，
+  不产生真实资金交易。
+end note
+
+note bottom of UC_ConsumeQuota
+  AI 结果成功保存后才扣除次数；
+  幂等重放或调用失败不重复扣次。
+end note
+
+@enduml
